@@ -1,1 +1,25 @@
-# Wrangler config
+# Wrangler configuration for Cloudflare Pages
+name = "momfood-app"
+compatibility_date = "2024-01-01"
+
+[env.production]
+account_id = "YOUR_ACCOUNT_ID_HERE"
+workers_dev = false
+
+[env.preview]
+account_id = "YOUR_ACCOUNT_ID_HERE"
+
+[vars]
+NODE_VERSION = "20"
+
+[[env.production.routes]]
+pattern = "mom.elfadil.com/*"
+zone_name = "elfadil.com"
+
+[build]
+command = "npm run build"
+upload.format = "directory"
+upload.directory = "dist"
+
+[build.env]
+NODE_VERSION = "20"

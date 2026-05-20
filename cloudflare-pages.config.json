@@ -1,0 +1,28 @@
+{
+  "build": {
+    "command": "npm run build",
+    "outputDirectory": "dist",
+    "rootDirectory": ".",
+    "environmentVariables": {
+      "NODE_VERSION": "20"
+    }
+  },
+  "routes": {
+    "include": [
+      "/*"
+    ],
+    "exclude": [
+      "/api/*"
+    ]
+  },
+  "functions": {
+    "express": true
+  },
+  "optimization": {
+    "html": true,
+    "css": true,
+    "js": true,
+    "json": true,
+    "xml": true
+  }
+}
