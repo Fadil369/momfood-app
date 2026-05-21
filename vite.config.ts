@@ -14,11 +14,14 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve(__dirname, 'src/main.tsx'),
+      input: resolve(__dirname, 'index.html'),
     },
   },
   server: {
     port: 3000,
     open: true,
+  },
+  define: {
+    'process.env': {}
   },
 })
