@@ -1,40 +1,9 @@
 name = "momfood-app"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-
-# ─── Cloudflare Pages frontend config ───────────────────────────────────────
-# The React app builds to ./dist and serves from this Pages project.
-# Domain mom.elfadil.com is bound via Cloudflare dashboard.
-
-[env.production]
-account_id = "YOUR_ACCOUNT_ID_HERE"
-workers_dev = false
-
-[env.preview]
-account_id = "YOUR_ACCOUNT_ID_HERE"
-
-[vars]
-NODE_VERSION = "20"
-
-[[env.production.routes]]
-pattern = "mom.elfadil.com/*"
-zone_name = "elfadil.com"
-
-[build]
-command = "npm run build"
-upload.format = "directory"
-upload.directory = "dist"
-
-[build.env]
-NODE_VERSION = "20"
+pages_build_output_dir = "./dist"
 
 # ─── D1 binding (ZuZu Platform — Phase 0) ───────────────────────────────────
-# Provision with:
-#   wrangler d1 create momfood-zuzu
-# Then paste the database_id below.
-# Apply schema:
-#   wrangler d1 migrations apply momfood-zuzu --remote
-
 [[d1_databases]]
 binding = "DB"
 database_name = "momfood-zuzu"
@@ -42,16 +11,28 @@ database_id = "ae43cf60-5517-44b0-9373-299ff1e68167"
 migrations_dir = "migrations"
 
 # ─── R2 bucket (verification docs + dish photos) ────────────────────────────
-# Provision with:
-#   wrangler r2 bucket create momfood-uploads
-
 [[r2_buckets]]
 binding = "UPLOADS"
 bucket_name = "momfood-uploads"
 
-# ─── Secrets (set via `wrangler secret put <KEY>`) ──────────────────────────
-#   ELEVENLABS_API_KEY     — TTS / ConvAI
-#   DEEPSEEK_API_KEY       — LLM (reuse from hnh-unified)
-#   JWT_SIGNING_KEY        — session token signing
-#   GRAVATAR_API_KEY       — avatar lookup
-#   ADMIN_BOOTSTRAP_PHONE  — seed admin user phone for first install
+# ─── Vars (non-secret) ──────────────────────────────────────────────────────
+[vars]
+NODE_VERSION = "20"
+
+# ─── Production environment overrides ───────────────────────────────────────
+[env.production]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "momfood-zuzu"
+database_id = "ae43cf60-5517-44b0-9373-299ff1e68167"
+
+[[env.production.r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "momfood-uploads"
+
+# ─── Secrets (set via wrangler pages secret put <KEY> --project-name momfood-app)
+#   ELEVENLABS_API_KEY     ✅ configured
+#   DEEPSEEK_API_KEY       ⏳ TODO (reuse from hnh-unified)
+#   JWT_SIGNING_KEY        ⏳ TODO (openssl rand -hex 64)
+#   GRAVATAR_API_KEY       ⏳ TODO (register app "ZuZu" first)
