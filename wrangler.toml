@@ -15,6 +15,10 @@ migrations_dir = "migrations"
 binding = "UPLOADS"
 bucket_name = "momfood-uploads"
 
+# ─── Workers AI (Whisper STT + Llama LLM — ZuZu's brain) ────────────────────
+[ai]
+binding = "AI"
+
 # ─── Vars (non-secret) ──────────────────────────────────────────────────────
 [vars]
 NODE_VERSION = "20"
@@ -31,8 +35,11 @@ database_id = "ae43cf60-5517-44b0-9373-299ff1e68167"
 binding = "UPLOADS"
 bucket_name = "momfood-uploads"
 
+[env.production.ai]
+binding = "AI"
+
 # ─── Secrets (set via wrangler pages secret put <KEY> --project-name momfood-app)
 #   ELEVENLABS_API_KEY     ✅ configured
-#   DEEPSEEK_API_KEY       ⏳ TODO (reuse from hnh-unified)
 #   JWT_SIGNING_KEY        ⏳ TODO (openssl rand -hex 64)
 #   GRAVATAR_API_KEY       ⏳ TODO (register app "ZuZu" first)
+# Note: No external LLM keys — ZuZu's brain is 100% Cloudflare Workers AI.

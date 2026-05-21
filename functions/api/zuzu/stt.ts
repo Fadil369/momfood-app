@@ -9,13 +9,7 @@ import { ok, fail } from '../../_lib/response'
 import type { Env } from '../../_middleware'
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-interface EnvWithAI extends Env {
-  AI?: {
-    run: (model: string, input: unknown) => Promise<{ text?: string } & Record<string, unknown>>
-  }
-}
-
-export const onRequestPost: PagesFunction<EnvWithAI> = async ({ env, request }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   if (!env.AI) {
     return fail('Workers AI binding not configured (add "AI" in Pages settings)', 503, 'AI_UNAVAILABLE')
   }
@@ -44,7 +38,7 @@ export const onRequestPost: PagesFunction<EnvWithAI> = async ({ env, request }) 
       audio: [...bytes],
       task: 'transcribe',
       language: lang === 'ar' ? 'ar' : 'en',
-    } as unknown)
+    } as never)
     const text = (result as { text?: string }).text ?? ''
     return ok({ text, lang })
   } catch (e) {

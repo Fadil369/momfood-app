@@ -6,8 +6,8 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 export interface Env {
   DB: D1Database
   UPLOADS: R2Bucket
+  AI?: Ai
   ELEVENLABS_API_KEY?: string
-  DEEPSEEK_API_KEY?: string
   JWT_SIGNING_KEY?: string
   GRAVATAR_API_KEY?: string
 }

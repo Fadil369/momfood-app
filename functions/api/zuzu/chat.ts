@@ -1,19 +1,16 @@
-// POST /api/zuzu/chat — ZuZu's LLM brain.
-// Body: { message: string, lang: 'ar'|'en', history?: {role,content}[] }
-// Returns: { ok, reply, data: { reply } }
+// POST /api/zuzu/chat — ZuZu's brain, powered 100% by Cloudflare Workers AI.
 //
-// Uses DeepSeek if DEEPSEEK_API_KEY is set; otherwise falls back to
-// Cloudflare Workers AI (env.AI binding) with llama-3.1.
+// Body:    { message: string, lang: 'ar'|'en', history?: {role,content}[] }
+// Returns: { ok: true, reply: string, data: { reply, provider, model } }
+//
+// Model strategy (in order):
+//   1. @cf/meta/llama-3.3-70b-instruct-fp8-fast  — best Arabic, very fast
+//   2. @cf/meta/llama-3.1-8b-instruct            — proven fallback
+//   3. canned reply                              — final safety net
 
-import { ok, fail, json } from '../../_lib/response'
+import { json, fail } from '../../_lib/response'
 import type { Env } from '../../_middleware'
 import type { PagesFunction } from '@cloudflare/workers-types'
-
-interface EnvWithAI extends Env {
-  AI?: {
-    run: (model: string, input: unknown) => Promise<unknown>
-  }
-}
 
 const ZUZU_SYSTEM_AR = `أنتِ زوزو — وكيلة ذكية صوتية لمنصة "لُقْمَة يُمّه"، حاضنة المطابخ السحابية.
 سُمّيتِ على اسم والدة د. محمد الفاضل تكريماً لها 💚.
@@ -59,7 +56,36 @@ interface ChatBody {
   history?: { role: 'user' | 'assistant'; content: string }[]
 }
 
-export const onRequestPost: PagesFunction<EnvWithAI> = async ({ env, request }) => {
+const MODELS = [
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  '@cf/meta/llama-3.1-8b-instruct',
+] as const
+
+interface LlamaResponse {
+  response?: string
+  result?: { response?: string }
+}
+
+async function tryModel(
+  ai: NonNullable<Env['AI']>,
+  model: string,
+  messages: { role: string; content: string }[],
+): Promise<string | null> {
+  try {
+    const result = (await ai.run(model, {
+      messages,
+      max_tokens: 240,
+      temperature: 0.75,
+    } as never)) as LlamaResponse
+    const reply = (result.response ?? result.result?.response ?? '').trim()
+    return reply || null
+  } catch (e) {
+    console.error(`workers-ai model ${model} failed:`, (e as Error).message)
+    return null
+  }
+}
+
+export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   let body: ChatBody
   try {
     body = await request.json()
@@ -74,62 +100,29 @@ export const onRequestPost: PagesFunction<EnvWithAI> = async ({ env, request }) 
 
   const system = lang === 'ar' ? ZUZU_SYSTEM_AR : ZUZU_SYSTEM_EN
   const messages = [
-    { role: 'system' as const, content: system },
-    ...(body.history ?? []).slice(-8),
-    { role: 'user' as const, content: text },
+    { role: 'system', content: system },
+    ...((body.history ?? []).slice(-8) as { role: string; content: string }[]),
+    { role: 'user', content: text },
   ]
 
-  // Path 1 — DeepSeek (preferred for quality + Arabic)
-  if (env.DEEPSEEK_API_KEY) {
-    try {
-      const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages,
-          temperature: 0.7,
-          max_tokens: 220,
-        }),
+  if (!env.AI) {
+    const fallback =
+      lang === 'ar'
+        ? 'أهلين! أنا زوزو. دماغي مش متصل لسه — د. محمد يشتغل عليه. بس أبشري، قريب جداً نكون جاهزين 💚'
+        : "Hi! I'm ZuZu. My brain isn't wired yet — Dr. Mohammed is on it. We'll be ready very soon 💚"
+    return json({ ok: true, reply: fallback, data: { reply: fallback, provider: 'fallback', model: 'none' } })
+  }
+
+  for (const model of MODELS) {
+    const reply = await tryModel(env.AI, model, messages)
+    if (reply) {
+      return json({
+        ok: true,
+        reply,
+        data: { reply, provider: 'workers-ai', model },
       })
-      if (!resp.ok) throw new Error(`deepseek ${resp.status}`)
-      const data = (await resp.json()) as {
-        choices?: { message?: { content?: string } }[]
-      }
-      const reply = data.choices?.[0]?.message?.content?.trim() ?? ''
-      return json({ ok: true, reply, data: { reply, provider: 'deepseek' } })
-    } catch (e) {
-      // fall through to Workers AI
-      console.error('deepseek failed', e)
     }
   }
 
-  // Path 2 — Workers AI llama fallback
-  if (env.AI) {
-    try {
-      const result = (await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-        messages,
-        max_tokens: 220,
-        temperature: 0.7,
-      })) as { response?: string }
-      const reply =
-        result.response?.trim() ??
-        (lang === 'ar'
-          ? 'أهلين! أنا زوزو. شو أقدر أساعدك فيه اليوم؟'
-          : "Hi! I'm ZuZu. How can I help you today?")
-      return json({ ok: true, reply, data: { reply, provider: 'workers-ai' } })
-    } catch (e) {
-      return fail(`llm error: ${(e as Error).message}`, 502, 'LLM_ERROR')
-    }
-  }
-
-  // Path 3 — graceful canned reply if nothing configured
-  const fallback =
-    lang === 'ar'
-      ? 'أهلين! أنا زوزو. لسه ما ربطت دماغي بالكامل — د. محمد يشتغل على الموضوع الحين. بس أبشري، قريب جداً نكون جاهزين 💚'
-      : "Hi! I'm ZuZu. My brain isn't fully wired yet — Dr. Mohammed is working on it. We'll be fully ready very soon 💚"
-  return json({ ok: true, reply: fallback, data: { reply: fallback, provider: 'fallback' } })
+  return fail('all Workers AI models failed', 502, 'LLM_ERROR')
 }
