@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* لُقمة يُمّه — global polish */
+html { scroll-behavior: smooth; }
+body { font-family: 'Tajawal', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.font-display { font-family: 'Cairo', 'Tajawal', serif; }
+.heartbeat { animation: heartbeat 1.6s ease-in-out infinite; }
+.typewriter-caret { animation: caret 0.9s steps(2) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .heartbeat, .typewriter-caret { animation: none !important; }
+}
+
+
 @layer base {
   :root {
     --background: 0 0% 100%;

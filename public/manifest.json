@@ -1,3 +1,19 @@
 {
-  "name": "Momfood Cloud Kitchen"
+  "name": "لُقْمَة يُمّه",
+  "short_name": "يُمّه",
+  "description": "من حبوباتنا سرّ طعم بلادنا — لُقمة هنية ودافية",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf6ee",
+  "theme_color": "#3a4a2a",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
