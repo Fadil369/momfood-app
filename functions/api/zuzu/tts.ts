@@ -8,7 +8,7 @@ import { fail } from '../../_lib/response'
 import type { Env } from '../../_middleware'
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-const DEFAULT_VOICE = 'pNInz6obpgDQGcFmaJgB' // Adam — multilingual
+const DEFAULT_VOICE = 'EXAVITQu4vr4xnSDxMaL' // Sarah — warm female, multilingual
 const DEFAULT_MODEL = 'eleven_multilingual_v2'
 
 export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
@@ -16,7 +16,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
     return fail('ElevenLabs not configured', 503, 'TTS_UNAVAILABLE')
   }
 
-  let body: { text?: string; voice_id?: string; model_id?: string }
+  let body: { text?: string; voice_id?: string; model_id?: string; lang?: string }
   try {
     body = await request.json()
   } catch {

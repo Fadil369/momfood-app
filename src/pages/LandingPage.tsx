@@ -3,12 +3,11 @@
  * A son's gift to his mother. Every pixel carries love. 💚
  */
 
-import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import React, { useMemo, useState, lazy, Suspense } from 'react'
+import { motion } from 'framer-motion'
 import {
   Heart,
   MessageCircle,
-  ChevronDown,
   Sparkles,
   MapPin,
   Clock,
@@ -18,6 +17,8 @@ import {
 } from 'lucide-react'
 import { menuItems, buildWhatsAppLink, WHATSAPP_NUMBER, type MenuItem } from '@/data/menu'
 import { useLanguage } from '@/contexts/LanguageContext'
+
+import ZuzuVoiceHero from '@/components/voice/ZuzuVoiceHero'
 
 const ZuZuAgent = lazy(() => import('@/ai/ZuZuAgent'))
 
@@ -109,26 +110,6 @@ const T = {
 
 type TKey = keyof typeof T
 
-// ─── Typewriter ─────────────────────────────────────────────────────────────
-function useTypewriter(text: string, speedMs = 90): string {
-  const [out, setOut] = useState('')
-  const reduce = useReducedMotion()
-  useEffect(() => {
-    if (reduce) {
-      setOut(text)
-      return
-    }
-    setOut('')
-    let i = 0
-    const id = window.setInterval(() => {
-      i += 1
-      setOut(text.slice(0, i))
-      if (i >= text.length) window.clearInterval(id)
-    }, speedMs)
-    return () => window.clearInterval(id)
-  }, [text, speedMs, reduce])
-  return out
-}
 
 // ─── Components ─────────────────────────────────────────────────────────────
 
@@ -160,83 +141,7 @@ const Header: React.FC = () => {
   )
 }
 
-const Hero: React.FC = () => {
-  const { lang } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
-  const line1 = useTypewriter(T.heroLine1[lang], 110)
-
-  return (
-    <section className="relative overflow-hidden min-h-[88vh] flex items-center">
-      {/* mesh background */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-cream via-cream-warm to-rose-50" />
-        <div className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-olive/15 blur-3xl" />
-        <div className="absolute bottom-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-gold/20 blur-3xl" />
-        <div className="absolute top-1/3 left-1/2 w-[40vw] h-[40vw] rounded-full bg-rose-200/30 blur-3xl" />
-      </div>
-
-      <div className="container mx-auto px-4 py-16 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 border border-gold/30 text-olive-dark text-sm mb-8"
-        >
-          <Sparkles className="w-4 h-4 text-gold" />
-          {t('slogan')}
-        </motion.div>
-
-        <h1 className="font-display font-bold leading-tight">
-          <span className="block text-5xl md:text-7xl lg:text-8xl bg-gradient-to-br from-olive-dark via-olive to-gold bg-clip-text text-transparent min-h-[1.2em]">
-            {line1}
-            <span className="inline-block w-[2px] h-[0.9em] bg-olive align-middle ms-1 typewriter-caret" />
-          </span>
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: T.heroLine1[lang].length * 0.11 + 0.3, duration: 1 }}
-            className="block text-4xl md:text-6xl lg:text-7xl text-gold-dark mt-2"
-          >
-            {t('heroLine2')}
-          </motion.span>
-        </h1>
-
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.4, duration: 0.8 }}
-          className="mt-8 text-lg md:text-2xl text-olive-dark/80 max-w-2xl mx-auto"
-        >
-          {t('heroSub')}
-        </motion.p>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.8, duration: 0.8 }}
-          className="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
-        >
-          <a
-            href={buildWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-gradient-to-l from-olive-dark to-olive text-cream font-medium text-lg shadow-lg shadow-olive/30 hover:shadow-xl hover:scale-[1.02] transition focus:outline-none focus:ring-4 focus:ring-olive/30"
-          >
-            <MessageCircle className="w-5 h-5 group-hover:rotate-[-6deg] transition" />
-            {t('heroOrderCta')}
-          </a>
-          <a
-            href="#menu"
-            className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-white/80 border-2 border-gold text-olive-dark font-medium text-lg hover:bg-white transition focus:outline-none focus:ring-4 focus:ring-gold/30"
-          >
-            {t('heroVoiceCta')}
-            <ChevronDown className="w-5 h-5" />
-          </a>
-        </motion.div>
-      </div>
-    </section>
-  )
-}
+// (legacy Hero replaced by ZuzuVoiceHero)
 
 const StorySection: React.FC = () => {
   const { lang } = useLanguage()
@@ -601,7 +506,7 @@ const LandingPage: React.FC = () => {
     <div className="min-h-screen bg-cream text-olive-dark font-sans">
       <Header />
       <main>
-        <Hero />
+        <ZuzuVoiceHero />
         <StorySection />
         <MenuSection />
         <GallerySection />

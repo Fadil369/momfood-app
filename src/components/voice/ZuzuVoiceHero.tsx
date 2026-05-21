@@ -1,0 +1,242 @@
+/**
+ * ZuzuVoiceHero — the hero section of mom.elfadil.com.
+ * The central orb IS ZuZu. Tap to talk. She listens, thinks, replies.
+ *
+ * Hooks together:
+ *   - useVoiceCapture (mic + analysis)
+ *   - useZuzuChat     (STT → LLM → TTS)
+ *   - ZuzuOrb         (visual)
+ */
+
+import React, { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Languages, Volume2, VolumeX } from 'lucide-react'
+import { ZuzuOrb, type ZuzuOrbState } from '@/components/voice/ZuzuOrb'
+import { useVoiceCapture } from '@/hooks/useVoiceCapture'
+import { useZuzuChat } from '@/hooks/useZuzuChat'
+import { useLanguage } from '@/contexts/LanguageContext'
+
+const GREETINGS = {
+  ar: 'أهلين بكِ في لُقْمَة يُمّه. أنا زوزو — مساعدتك الذكية. اضغطي على الدائرة وكلميني عن اللي تبينه.',
+  en: "Welcome to Loqmat Yummah. I'm ZuZu — your smart assistant. Tap the circle and tell me what you're craving.",
+}
+
+const STATE_LABELS = {
+  ar: {
+    idle: 'اضغطي للكلام',
+    listening: 'أسمعك… تكلمي',
+    thinking: 'لحظة أفكر…',
+    speaking: 'زوزو تتكلم',
+  },
+  en: {
+    idle: 'Tap to talk',
+    listening: "I'm listening…",
+    thinking: 'Thinking…',
+    speaking: 'ZuZu speaking',
+  },
+} as const
+
+export const ZuzuVoiceHero: React.FC = () => {
+  const { lang, toggle: toggleLang } = useLanguage()
+  const mic = useVoiceCapture()
+  const chat = useZuzuChat()
+  const [muted, setMuted] = useState(true) // start muted; user must opt in for audio (autoplay policy)
+  const [greeted, setGreeted] = useState(false)
+  const [showCaptions] = useState(true)
+
+  // Derive overall orb state from mic/chat
+  const orbState: ZuzuOrbState = mic.isRecording
+    ? 'listening'
+    : chat.mode === 'thinking'
+    ? 'thinking'
+    : chat.mode === 'speaking'
+    ? 'speaking'
+    : 'idle'
+
+  // Greeting on first unmute
+  useEffect(() => {
+    if (!muted && !greeted) {
+      setGreeted(true)
+      chat.speak(GREETINGS[lang], lang).catch(() => {})
+    }
+  }, [muted, greeted, lang, chat])
+
+  const onOrbTap = async () => {
+    if (muted) {
+      // First tap unmutes + greets
+      setMuted(false)
+      return
+    }
+    if (chat.mode === 'speaking' || chat.mode === 'thinking') {
+      // Tap during ZuZu reply -> interrupt (future); for now ignore
+      return
+    }
+    if (mic.isRecording) {
+      const blob = await mic.stop()
+      if (blob) await chat.processAudio(blob, lang)
+    } else {
+      try {
+        await mic.start()
+      } catch {
+        // user denied mic
+      }
+    }
+  }
+
+  const visualLevel = mic.isRecording ? mic.level : chat.audioLevel
+
+  return (
+    <section
+      id="zuzu-hero"
+      className="relative min-h-[100svh] flex flex-col items-center justify-center overflow-hidden px-4 py-16"
+      style={{
+        background:
+          'radial-gradient(ellipse at top, #faf6ee 0%, #f5ead4 35%, #e8dcc0 100%)',
+      }}
+    >
+      {/* Decorative ambient glows */}
+      <div
+        aria-hidden
+        className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-60 blur-3xl"
+        style={{ background: 'radial-gradient(circle, #c9a96155 0%, transparent 70%)' }}
+      />
+      <div
+        aria-hidden
+        className="absolute -bottom-32 -right-32 w-[28rem] h-[28rem] rounded-full opacity-50 blur-3xl"
+        style={{ background: 'radial-gradient(circle, #e8b4a055 0%, transparent 70%)' }}
+      />
+
+      {/* Top controls */}
+      <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
+        <button
+          onClick={toggleLang}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 backdrop-blur-md border border-white/60 shadow text-sm font-medium text-olive-dark hover:bg-white transition"
+          aria-label={lang === 'ar' ? 'English' : 'العربية'}
+        >
+          <Languages className="w-4 h-4" />
+          {lang === 'ar' ? 'EN' : 'AR'}
+        </button>
+        <button
+          onClick={() => setMuted((m) => !m)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 backdrop-blur-md border border-white/60 shadow text-sm font-medium text-olive-dark hover:bg-white transition"
+          aria-label={muted ? (lang === 'ar' ? 'تفعيل الصوت' : 'Unmute') : lang === 'ar' ? 'كتم' : 'Mute'}
+        >
+          {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          {muted ? (lang === 'ar' ? 'الصوت مكتوم' : 'Muted') : lang === 'ar' ? 'مفتوح' : 'On'}
+        </button>
+      </div>
+
+      {/* Brand line */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="text-center mb-8 z-10"
+      >
+        <p className="text-xs uppercase tracking-[0.4em] text-olive/70 mb-3 font-medium">
+          {lang === 'ar' ? 'لُقْمَة يُمّه' : 'Loqmat Yummah'}
+        </p>
+        <h1
+          className="text-4xl sm:text-5xl md:text-6xl font-display font-bold text-olive-dark leading-tight"
+          style={{ direction: lang === 'ar' ? 'rtl' : 'ltr' }}
+        >
+          {lang === 'ar' ? (
+            <>
+              أنا <span className="text-gold">زوزو</span>
+            </>
+          ) : (
+            <>
+              I'm <span className="text-gold">ZuZu</span>
+            </>
+          )}
+        </h1>
+        <p className="mt-3 text-base sm:text-lg text-olive/80 max-w-xl mx-auto">
+          {lang === 'ar'
+            ? 'سُمّيت على أُمّ د. محمد 💚 — حاضنة الطبّاخات، صوت لُقمتك الدافية'
+            : "Named after Dr. Mohammed's mother 💚 — the voice of warm home cooking"}
+        </p>
+      </motion.div>
+
+      {/* The Orb */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
+        className="z-10"
+      >
+        <ZuzuOrb
+          state={orbState}
+          level={visualLevel}
+          bars={mic.bars}
+          onTap={onOrbTap}
+          size={
+            typeof window !== 'undefined' && window.innerWidth < 480 ? 280 : 340
+          }
+          labelAr={STATE_LABELS.ar[orbState]}
+          labelEn={STATE_LABELS.en[orbState]}
+          lang={lang}
+        />
+      </motion.div>
+
+      {/* Captions (transcript / reply) */}
+      <div className="mt-20 z-10 w-full max-w-2xl px-2">
+        <AnimatePresence mode="wait">
+          {showCaptions && (chat.transcript || chat.reply) && (
+            <motion.div
+              key={chat.reply || chat.transcript}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.4 }}
+              className="rounded-2xl bg-white/75 backdrop-blur-xl border border-white/60 shadow-xl p-5"
+              style={{ direction: lang === 'ar' ? 'rtl' : 'ltr' }}
+            >
+              {chat.transcript && (
+                <p className="text-sm text-olive/70 mb-2">
+                  <span className="font-medium">
+                    {lang === 'ar' ? 'أنت:' : 'You:'}
+                  </span>{' '}
+                  {chat.transcript}
+                </p>
+              )}
+              {chat.reply && (
+                <p className="text-lg text-olive-dark leading-relaxed">
+                  <span className="font-medium text-gold">
+                    {lang === 'ar' ? 'زوزو:' : 'ZuZu:'}
+                  </span>{' '}
+                  {chat.reply}
+                </p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Error */}
+        {(mic.error || chat.error) && (
+          <div className="mt-4 text-center text-sm text-rose-600/80">
+            {mic.error === 'mic_denied' || mic.error?.includes('denied')
+              ? lang === 'ar'
+                ? 'يرجى السماح بالوصول للميكروفون لتحدثي مع زوزو 🎙️'
+                : 'Please allow microphone access to talk to ZuZu 🎙️'
+              : mic.error || chat.error}
+          </div>
+        )}
+
+        {/* Hint */}
+        {!chat.transcript && !chat.reply && (
+          <p className="mt-6 text-center text-sm text-olive/60">
+            {lang === 'ar'
+              ? muted
+                ? '🔇 اضغطي على الدائرة لتفعيل الصوت والترحيب من زوزو'
+                : '💡 جربي تقولين: «زوزو، شو عندك اليوم؟» أو «أبغى أسجل مطبخي»'
+              : muted
+              ? '🔇 Tap the orb to unmute and meet ZuZu'
+              : '💡 Try: "ZuZu, what\'s on the menu today?" or "I want to register my kitchen"'}
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export default ZuzuVoiceHero
