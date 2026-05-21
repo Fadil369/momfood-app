@@ -2,69 +2,186 @@
 @tailwind components;
 @tailwind utilities;
 
-/* لُقمة يُمّه — global polish */
-html { scroll-behavior: smooth; }
-body { font-family: 'Tajawal', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-.font-display { font-family: 'Cairo', 'Tajawal', serif; }
-.heartbeat { animation: heartbeat 1.6s ease-in-out infinite; }
-.typewriter-caret { animation: caret 0.9s steps(2) infinite; }
-@media (prefers-reduced-motion: reduce) {
-  .heartbeat, .typewriter-caret { animation: none !important; }
-}
 
-
+/* ─── Brand tokens — لُقمة يُمّه ──────────────────────────────────────── */
+/* HSL only, dark-mode aware. Olive/gold/cream + dark slate-warm. */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --ring: 215 20.2% 65.1%;
-    --radius: 0.5rem;
+    /* Brand-specific raw values (HSL) */
+    --olive-50:  60 35% 96%;
+    --olive-100: 60 30% 90%;
+    --olive-200: 70 25% 80%;
+    --olive-300: 75 22% 68%;
+    --olive-400: 80 20% 55%;
+    --olive-500: 82 28% 38%;   /* core olive */
+    --olive-600: 84 32% 30%;
+    --olive-700: 86 36% 22%;
+    --olive-800: 88 40% 15%;
+    --olive-900: 90 45% 10%;
+
+    --gold-50:  44 80% 96%;
+    --gold-100: 44 85% 90%;
+    --gold-200: 42 80% 78%;
+    --gold-300: 40 75% 65%;
+    --gold-400: 38 72% 56%;
+    --gold-500: 36 70% 48%;   /* core gold */
+    --gold-600: 34 75% 40%;
+    --gold-700: 32 80% 32%;
+
+    --rose-100: 14 70% 92%;
+    --rose-300: 14 70% 75%;
+    --rose-500: 14 70% 58%;
+    --rose-700: 14 70% 40%;
+
+    --cream-50:  40 50% 97%;
+    --cream-100: 38 55% 94%;
+    --cream-200: 36 50% 88%;
+
+    /* shadcn semantic tokens — LIGHT */
+    --background:      40 50% 98%;
+    --foreground:      88 40% 12%;
+    --muted:           38 30% 92%;
+    --muted-foreground:88 15% 35%;
+    --popover:         0 0% 100%;
+    --popover-foreground: 88 40% 12%;
+    --card:            0 0% 100%;
+    --card-foreground: 88 40% 12%;
+    --border:          38 25% 85%;
+    --input:           38 25% 88%;
+    --primary:         82 35% 32%;        /* olive-deep */
+    --primary-foreground: 40 50% 98%;
+    --secondary:       38 45% 92%;        /* cream */
+    --secondary-foreground: 88 40% 18%;
+    --accent:          36 70% 48%;        /* gold */
+    --accent-foreground: 40 50% 98%;
+    --destructive:     14 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --ring:            36 70% 48%;
+    --radius:          0.75rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --ring: 217.2 32.6% 17.5%;
+    --background:      88 25% 6%;
+    --foreground:      40 40% 95%;
+    --muted:           88 15% 14%;
+    --muted-foreground:40 20% 65%;
+    --popover:         88 30% 8%;
+    --popover-foreground: 40 40% 95%;
+    --card:            88 30% 9%;
+    --card-foreground: 40 40% 95%;
+    --border:          88 15% 18%;
+    --input:           88 15% 18%;
+    --primary:         70 50% 70%;
+    --primary-foreground: 88 40% 10%;
+    --secondary:       88 15% 14%;
+    --secondary-foreground: 40 40% 95%;
+    --accent:          38 75% 60%;
+    --accent-foreground: 88 40% 10%;
+    --destructive:     14 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --ring:            38 75% 60%;
+  }
+
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+  body[dir='rtl'] { font-family: 'Tajawal', 'Inter', system-ui, sans-serif; }
+  body[dir='ltr'] { font-family: 'Inter', 'Tajawal', system-ui, sans-serif; }
+
+  ::selection { background: hsl(var(--accent) / 0.25); color: hsl(var(--foreground)); }
+  *:focus-visible { outline: 2px solid hsl(var(--ring) / 0.6); outline-offset: 2px; border-radius: 4px; }
+}
+
+/* ─── Typography utilities ─────────────────────────────────────────── */
+@layer utilities {
+  .font-display { font-family: 'Cairo', 'Tajawal', 'Inter', serif; letter-spacing: -0.02em; }
+  .font-arabic  { font-family: 'Tajawal', system-ui, sans-serif; }
+  .font-latin   { font-family: 'Inter', system-ui, sans-serif; }
+
+  /* Premium gradient text */
+  .text-gradient-gold {
+    background: linear-gradient(135deg, hsl(var(--gold-400)) 0%, hsl(var(--gold-600)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .text-gradient-olive {
+    background: linear-gradient(135deg, hsl(var(--olive-600)) 0%, hsl(var(--olive-800)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Glass surfaces */
+  .glass {
+    background: hsl(var(--background) / 0.65);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+  .glass-strong {
+    background: hsl(var(--background) / 0.85);
+    backdrop-filter: blur(28px) saturate(200%);
+    -webkit-backdrop-filter: blur(28px) saturate(200%);
+    border: 1px solid hsl(var(--border) / 0.8);
+  }
+
+  /* Premium grid background */
+  .bg-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 60% 60% at center, black 30%, transparent 80%);
+  }
+
+  /* Ambient blobs */
+  .blob-gold {
+    background: radial-gradient(circle, hsl(var(--gold-400) / 0.35) 0%, transparent 70%);
+    filter: blur(60px);
+  }
+  .blob-olive {
+    background: radial-gradient(circle, hsl(var(--olive-400) / 0.30) 0%, transparent 70%);
+    filter: blur(60px);
+  }
+  .blob-rose {
+    background: radial-gradient(circle, hsl(var(--rose-300) / 0.35) 0%, transparent 70%);
+    filter: blur(60px);
+  }
+
+  /* Subtle premium shadow */
+  .shadow-premium {
+    box-shadow:
+      0 1px 2px hsl(var(--olive-900) / 0.04),
+      0 8px 24px hsl(var(--olive-900) / 0.06),
+      0 24px 48px hsl(var(--olive-900) / 0.04);
+  }
+  .shadow-premium-lg {
+    box-shadow:
+      0 1px 2px hsl(var(--olive-900) / 0.05),
+      0 12px 32px hsl(var(--olive-900) / 0.08),
+      0 32px 64px hsl(var(--olive-900) / 0.06);
+  }
+
+  /* Marquee */
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .animate-marquee { animation: marquee 40s linear infinite; }
+
+  /* Shimmer for skeletons */
+  @keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+  .animate-shimmer {
+    background: linear-gradient(90deg, hsl(var(--muted)) 0%, hsl(var(--muted-foreground) / 0.15) 50%, hsl(var(--muted)) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

@@ -244,7 +244,7 @@ export const ZuzuOrb: React.FC<ZuzuOrbProps> = ({
           key={state}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute -bottom-10 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-white/60 shadow-lg text-sm font-medium text-olive-dark whitespace-nowrap"
+          className="absolute -bottom-10 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full glass-strong shadow-premium text-sm font-medium text-foreground whitespace-nowrap"
           style={{ direction: lang === 'ar' ? 'rtl' : 'ltr' }}
         >
           {lang === 'ar' ? labelAr : labelEn}

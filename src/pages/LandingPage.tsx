@@ -1,187 +1,103 @@
 /**
- * لُقْمَة يُمّه — Landing Page
- * A son's gift to his mother. Every pixel carries love. 💚
+ * لُقْمَة يُمّه — Landing Page (Phase 2.5 — shadcn premium pass)
+ *
+ * Sections:
+ *   1. SiteHeader (fixed glass pill)
+ *   2. ZuzuVoiceHero (hero + orb)
+ *   3. FeaturesGrid (what ZuZu does)
+ *   4. HowItWorks (3-step strip)
+ *   5. JoinCTA (cook / driver / care program)
+ *   6. SiteFooter
  */
 
-import React, { useMemo, useState, lazy, Suspense } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
-  Heart,
-  MessageCircle,
-  Sparkles,
-  MapPin,
-  Clock,
-  Phone,
-  Languages,
-  X,
+  ShoppingBag,
+  ChefHat,
+  Bike,
+  CreditCard,
+  ShieldCheck,
+  HeartHandshake,
+  Mic,
+  Brain,
+  Truck,
+  ArrowRight,
 } from 'lucide-react'
-import { menuItems, buildWhatsAppLink, WHATSAPP_NUMBER, type MenuItem } from '@/data/menu'
 import { useLanguage } from '@/contexts/LanguageContext'
-
+import { SiteHeader } from '@/components/layout/SiteHeader'
+import { SiteFooter } from '@/components/layout/SiteFooter'
 import ZuzuVoiceHero from '@/components/voice/ZuzuVoiceHero'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
-const ZuZuAgent = lazy(() => import('@/ai/ZuZuAgent'))
-
-// ─── i18n helpers ───────────────────────────────────────────────────────────
-// لُقْمَة يُمّه — Cloud Kitchen Incubator, hosted by ZuZu (the agent named after Mama 💚)
-const T = {
-  brand: { ar: 'لُقْمَة يُمّه', en: 'Loqmat Yummah' },
-  tagline: { ar: 'حاضنة المطابخ السحابية، تديرها زوزو', en: 'A cloud kitchen incubator — hosted by ZuZu' },
-  bismillah: { ar: 'بسم الله ما شاء الله', en: 'In the name of God' },
-  slogan: {
-    ar: 'من حبوباتنا سرّ طعم بلادنا',
-    en: "From our grandmothers' hands — the secret of our homeland's taste",
-  },
-
-  // ZuZu hero
-  zuzuGreet: { ar: 'أهلين، أنا زوزو 👋', en: "Hi, I'm ZuZu 👋" },
-  heroLine1: { ar: 'أنا زوزو — مساعدتك في', en: "I'm ZuZu — your host at" },
-  heroLine2: { ar: 'لُقْمَة يُمّه', en: 'Loqmat Yummah' },
-  heroSub: {
-    ar: 'منصة بسم أمي — تحضن الطباخات، توصل اللُّقمة الدافية لبيتك، وتفتح أبواب الرزق بأيدي ماهرة.',
-    en: "A platform named after my mother — incubating home cooks, delivering warm bites to your door, opening doors of livelihood for skilled hands.",
-  },
-  heroVoiceCta: { ar: '🎙️ تكلّم مع زوزو', en: '🎙️ Talk to ZuZu' },
-  heroOrderCta: { ar: 'اطلبي طعام', en: 'Order Food' },
-  heroJoinCta: { ar: 'انضمي كطبّاخة', en: 'Join as a Cook' },
-
-  // ZuZu capabilities strip
-  capsTitle: { ar: 'زوزو تفعل كل شيء', en: 'ZuZu handles everything' },
-  capsSub: { ar: 'وكيلٌ ذكيّ، يتكلّم ويسمع، ويُنسّق كأنّه واحد من العيلة', en: 'A smart, voice-first agent who feels like family' },
-  cap1: { ar: '🛒 يأخذ طلبات العملاء بالصوت', en: '🛒 Takes customer orders by voice' },
-  cap2: { ar: '👩\u200d🍳 يسجّل المطابخ والشركاء', en: '👩\u200d🍳 Onboards kitchens & partners' },
-  cap3: { ar: '🛵 ينسّق مع السائقين', en: '🛵 Coordinates with drivers' },
-  cap4: { ar: '💳 يتابع المدفوعات والفواتير', en: '💳 Tracks payments & invoices' },
-  cap5: { ar: '🪪 يتحقّق من الهويات بسرّية', en: '🪪 Verifies identities privately' },
-  cap6: { ar: '🤲 يساعد الأسر المحتاجة', en: '🤲 Supports families in need' },
-
-  // Story (now about the platform + Mama)
-  storyTitle: { ar: 'لماذا زوزو؟', en: 'Why ZuZu?' },
-  story1Title: { ar: 'الاسم', en: 'The Name' },
-  story1Body: {
-    ar: 'زوزو هو اسم أمي. كل ابتسامة في هذه المنصة، وكل لُقمة دافية تصل إليك، اسمها يحملها.',
-    en: "ZuZu is my mother's name. Every smile on this platform, every warm bite reaching you, carries her name.",
-  },
-  story2Title: { ar: 'الحاضنة', en: 'The Incubator' },
-  story2Body: {
-    ar: 'نحتضن الطبّاخات في بيوتهن — معدّات، تدريب، توصيل، ومنصة دفع. الحبوبة تطبخ، ونحن نتكفّل بالباقي.',
-    en: 'We incubate home cooks — equipment, training, delivery, and payments. She cooks; we handle the rest.',
-  },
-  story3Title: { ar: 'الوكيل الذكي', en: 'The Agent' },
-  story3Body: {
-    ar: 'زوزو — الوكيل — يستقبلك بصوته، يأخذ طلبك، يتابع طبخه، ويُحضره دافياً لباب بيتك. كأنه واحد من العيلة.',
-    en: 'ZuZu — the agent — greets you with her voice, takes your order, watches it cook, and delivers it warm. Like family.',
-  },
-
-  menuTitle: { ar: 'من مطابخنا اليوم', en: "From Today's Kitchens" },
-  menuSub: { ar: 'كل طبق يحكي قصة — وزوزو توصلها لك', en: 'Every dish tells a story — ZuZu delivers it to you' },
-  catMains: { ar: 'الأطباق الرئيسية', en: 'Main Dishes' },
-  catSalads: { ar: 'السلطات', en: 'Salads' },
-  catExtras: { ar: 'الإضافات', en: 'Extras' },
-  riyal: { ar: 'ريال', en: 'SAR' },
-  orderItem: { ar: 'اطلب من زوزو', en: 'Order via ZuZu' },
-
-  galleryTitle: { ar: 'من مطابخ يُمّه', en: "From Mama's Kitchens" },
-  gallerySub: { ar: 'بصمات الحب في كل صحن', en: 'Fingerprints of love in every plate' },
-
-  // Partner programs (incubator)
-  partnersTitle: { ar: 'انضمي إلى عائلة لُقْمَة يُمّه', en: 'Join the Loqmat Yummah Family' },
-  partnersSub: { ar: 'سواء كنتِ طبّاخة، سائق، أو شريك خير — زوزو ترحّب بكم', en: 'Cook, driver, or partner-in-good — ZuZu welcomes you' },
-  cookCard: { ar: 'طبّاخة منزلية', en: 'Home Cook' },
-  cookDesc: { ar: 'حبوبتك تطبخ من بيتها، ونحن نوصّل وندفع لها. زوزو ترتّب كل شيء.', en: 'She cooks from home; we deliver and pay her. ZuZu handles everything.' },
-  driverCard: { ar: 'سائق توصيل', en: 'Delivery Driver' },
-  driverDesc: { ar: 'انضم لشبكتنا، خذ طلبات قريبة منك، ادفع لعائلتك بكرامة.', en: 'Join our network. Take nearby orders. Provide for your family.' },
-  socialCard: { ar: 'برنامج الخير', en: 'Care Program' },
-  socialDesc: { ar: 'للطلبة، كبار السن، اللاجئين والعمال — وجبات مدعومة بعد التحقق.', en: 'For students, elders, refugees, workers — subsidised meals after verification.' },
-  joinCta: { ar: 'سجّلني مع زوزو', en: 'Register with ZuZu' },
-
-  contactTitle: { ar: 'تواصلي معنا', en: 'Reach ZuZu' },
-  hours: { ar: 'زوزو متاحة على مدار الساعة', en: 'ZuZu is available 24/7' },
-  location: { ar: 'الرياض، المملكة العربية السعودية', en: 'Riyadh, Saudi Arabia' },
-  callNow: { ar: 'اتصل الآن', en: 'Call now' },
-
-  dedication: {
-    ar: 'سُمّيت هذه المنصة باسم أُمّي زوزو — حفظها الله 💚\nمن يدِ يُمّه إلى كل سفرة في وطننا',
-    en: "This platform is named after my mother, ZuZu — may God protect her 💚\nFrom Mama's hands to every table in our homeland",
-  },
-  chatWithMama: { ar: 'تكلّم مع زوزو', en: 'Talk to ZuZu' },
-  closeChat: { ar: 'إغلاق', en: 'Close' },
+// ─── Features grid ─────────────────────────────────────────────────────────
+const FEATURES = {
+  ar: [
+    { icon: ShoppingBag, title: 'تأخذ الطلبات بالصوت', desc: 'العميل يتكلم كأنه يطلب من قريب — لا فورمات، لا تعقيد.' },
+    { icon: ChefHat, title: 'تسجّل الطبّاخات', desc: 'بمكالمة واحدة، أم سارة تنضم وتفتح مطبخها السحابي.' },
+    { icon: Bike, title: 'تنسّق مع السائقين', desc: 'تختار أقرب سائق، تتابع التوصيل، تتأكد من وصول اللُقمة دافية.' },
+    { icon: CreditCard, title: 'تتابع المدفوعات', desc: 'حسابات شفافة لكل طبّاخة، فواتير لحظية، تحصيل آمن.' },
+    { icon: ShieldCheck, title: 'تحمي الخصوصية', desc: 'هوياتٌ مُجزّأة، أرقامٌ مخفية، خصوصيةٌ صارمة.' },
+    { icon: HeartHandshake, title: 'تساعد المحتاجين', desc: 'برنامج الخير يربط الطبّاخات بالأسر المحتاجة بكرامة.' },
+  ],
+  en: [
+    { icon: ShoppingBag, title: 'Takes voice orders', desc: 'Customers speak naturally — no forms, no complexity.' },
+    { icon: ChefHat, title: 'Onboards cooks', desc: 'One call, and Umm Sara joins to open her cloud kitchen.' },
+    { icon: Bike, title: 'Coordinates drivers', desc: 'Picks the nearest driver, tracks delivery, ensures warm arrival.' },
+    { icon: CreditCard, title: 'Tracks payments', desc: 'Transparent ledgers per cook, instant invoices, secure collection.' },
+    { icon: ShieldCheck, title: 'Protects privacy', desc: 'Hashed IDs, masked phone numbers, strict data handling.' },
+    { icon: HeartHandshake, title: 'Supports the needy', desc: 'Care Program connects cooks with families in need, with dignity.' },
+  ],
 } as const
 
-type TKey = keyof typeof T
-
-
-// ─── Components ─────────────────────────────────────────────────────────────
-
-const Header: React.FC = () => {
-  const { lang, toggle } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
-  return (
-    <header className="sticky top-0 z-40 backdrop-blur-md bg-cream/70 border-b border-gold/20">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-olive to-olive-dark flex items-center justify-center shadow-md">
-            <Heart className="w-5 h-5 text-gold heartbeat" fill="currentColor" />
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="font-display text-xl text-olive-dark font-bold">{t('brand')}</span>
-            <span className="text-[10px] text-olive/70 tracking-wide">{t('bismillah')}</span>
-          </div>
-        </div>
-        <button
-          onClick={toggle}
-          aria-label="Toggle language"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/60 hover:bg-white border border-gold/30 text-olive-dark text-sm font-medium transition"
-        >
-          <Languages className="w-4 h-4" />
-          {lang === 'ar' ? 'EN' : 'عربي'}
-        </button>
-      </div>
-    </header>
-  )
-}
-
-// (legacy Hero replaced by ZuzuVoiceHero)
-
-const StorySection: React.FC = () => {
+const FeaturesGrid: React.FC = () => {
   const { lang } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
-  const steps: Array<{ titleKey: TKey; bodyKey: TKey; emoji: string }> = [
-    { titleKey: 'story1Title', bodyKey: 'story1Body', emoji: '🌾' },
-    { titleKey: 'story2Title', bodyKey: 'story2Body', emoji: '🤲' },
-    { titleKey: 'story3Title', bodyKey: 'story3Body', emoji: '🍽️' },
-  ]
+  const isAr = lang === 'ar'
+  const items = FEATURES[lang]
   return (
-    <section className="py-24 bg-gradient-to-b from-cream-warm to-cream">
-      <div className="container mx-auto px-4">
-        <motion.h2
+    <section id="features" className="relative py-24 px-4">
+      <div className="absolute inset-0 -z-10 bg-grid opacity-30" />
+      <div className="mx-auto max-w-6xl">
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
-          className="font-display text-4xl md:text-5xl text-center text-olive-dark mb-4 font-bold"
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-14 max-w-2xl mx-auto"
         >
-          {t('storyTitle')}
-        </motion.h2>
-        <div className="w-24 h-1 bg-gradient-to-r from-gold to-olive mx-auto mb-16 rounded-full" />
-        <div className="grid md:grid-cols-3 gap-8">
-          {steps.map((s, i) => (
+          <Badge variant="olive" size="sm" className="mb-4">
+            {isAr ? 'كيف تساعدك زوزو' : 'How ZuZu helps'}
+          </Badge>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold tracking-tight text-foreground">
+            {isAr ? 'وكيلٌ واحد، ستّ خدمات' : 'One agent, six superpowers'}
+          </h2>
+          <p className="mt-3 text-muted-foreground text-base sm:text-lg leading-relaxed">
+            {isAr
+              ? 'كل ما تحتاجه حاضنة المطابخ السحابية، في صوتٍ دافئٍ واحد.'
+              : 'Everything a cloud kitchen incubator needs — in one warm voice.'}
+          </p>
+        </motion.div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {items.map(({ icon: Icon, title, desc }, i) => (
             <motion.div
-              key={s.titleKey}
-              initial={{ opacity: 0, y: 40 }}
+              key={title}
+              initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-50px' }}
-              transition={{ duration: 0.7, delay: i * 0.15 }}
-              className="relative bg-white/60 backdrop-blur-sm rounded-3xl p-8 border border-gold/20 shadow-sm hover:shadow-xl transition"
+              transition={{ duration: 0.4, delay: i * 0.05 }}
             >
-              <div className="text-6xl mb-4 text-center">{s.emoji}</div>
-              <h3 className="font-display text-2xl text-olive-dark font-bold text-center mb-3">
-                {t(s.titleKey)}
-              </h3>
-              <p className="text-olive-dark/80 text-center leading-relaxed">{t(s.bodyKey)}</p>
-              <div className="absolute -top-3 start-6 w-8 h-8 rounded-full bg-gradient-to-br from-gold to-gold-dark text-cream flex items-center justify-center text-sm font-bold shadow">
-                {i + 1}
-              </div>
+              <Card variant="premium" className="h-full group hover:shadow-premium-lg hover:-translate-y-1 transition-all duration-300">
+                <CardContent className="p-6">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gold-100 to-gold-200 dark:from-gold-700/30 dark:to-gold-600/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Icon className="h-5 w-5 text-gold-700 dark:text-gold-300" />
+                  </div>
+                  <h3 className="font-display font-bold text-lg mb-2 text-foreground">{title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+                </CardContent>
+              </Card>
             </motion.div>
           ))}
         </div>
@@ -190,330 +106,208 @@ const StorySection: React.FC = () => {
   )
 }
 
-const MenuCard: React.FC<{ item: MenuItem }> = ({ item }) => {
+// ─── How it works ──────────────────────────────────────────────────────────
+const STEPS = {
+  ar: [
+    { icon: Mic, title: 'تكلّمي', desc: 'اضغطي على الدائرة وقولي لزوزو وش تبين.' },
+    { icon: Brain, title: 'زوزو تفهم', desc: 'تختار المطبخ المناسب، تحجز، وتأكد التفاصيل.' },
+    { icon: Truck, title: 'يوصلك دافي', desc: 'السائق يجي، اللُقمة تصل — كأنها من يد يُمّك.' },
+  ],
+  en: [
+    { icon: Mic, title: 'Just speak', desc: 'Tap the orb and tell ZuZu what you want.' },
+    { icon: Brain, title: 'ZuZu understands', desc: 'Picks the right kitchen, books it, confirms details.' },
+    { icon: Truck, title: 'Warm to your door', desc: 'Driver arrives, bite arrives — as if from your mother.' },
+  ],
+} as const
+
+const HowItWorks: React.FC = () => {
   const { lang } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
+  const isAr = lang === 'ar'
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-30px' }}
-      transition={{ duration: 0.5 }}
-      whileHover={{ y: -4 }}
-      className="group relative bg-white/70 backdrop-blur-md rounded-2xl p-6 border border-gold/20 shadow-sm hover:shadow-2xl hover:border-gold/50 transition-all"
-    >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="text-5xl select-none" aria-hidden>
-          {item.emoji}
-        </div>
-        <div className="text-end">
-          <div className="text-3xl font-display font-bold text-olive-dark">
-            {item.price}
-            <span className="text-base text-gold-dark ms-1">﷼</span>
-          </div>
-          <div className="text-[11px] text-olive/60 uppercase tracking-wider">{t('riyal')}</div>
-        </div>
-      </div>
-      <h3 className="font-display text-2xl font-bold text-olive-dark mb-1">{item.nameAr}</h3>
-      <p className="text-sm text-gold-dark/80 italic mb-3">{item.nameEn}</p>
-      <p className="text-olive-dark/75 text-sm leading-relaxed mb-5 min-h-[2.5rem]">
-        {item.descAr}
-      </p>
-      <a
-        href={buildWhatsAppLink(item.nameAr)}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${t('orderItem')}: ${item.nameAr}`}
-        className="inline-flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-full bg-olive-dark/90 hover:bg-olive-dark text-cream text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-gold"
-      >
-        <MessageCircle className="w-4 h-4" />
-        {t('orderItem')}
-      </a>
-    </motion.article>
-  )
-}
-
-const MenuSection: React.FC = () => {
-  const { lang } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
-  const grouped = useMemo(() => {
-    return {
-      mains: menuItems.filter((i) => i.category === 'mains'),
-      salads: menuItems.filter((i) => i.category === 'salads'),
-      extras: menuItems.filter((i) => i.category === 'extras'),
-    }
-  }, [])
-
-  const renderGroup = (title: string, items: MenuItem[]) => (
-    <div className="mb-16 last:mb-0">
-      <div className="flex items-center gap-4 mb-8">
-        <div className="h-px flex-1 bg-gradient-to-l from-transparent to-gold/40" />
-        <h3 className="font-display text-2xl md:text-3xl text-olive-dark font-bold whitespace-nowrap">
-          {title}
-        </h3>
-        <div className="h-px flex-1 bg-gradient-to-r from-transparent to-gold/40" />
-      </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {items.map((it) => (
-          <MenuCard key={it.id} item={it} />
-        ))}
-      </div>
-    </div>
-  )
-
-  return (
-    <section id="menu" className="py-24 bg-gradient-to-b from-cream to-cream-warm">
-      <div className="container mx-auto px-4">
+    <section className="relative py-24 px-4 bg-gradient-to-b from-background via-cream-50/40 to-background dark:via-olive-900/30">
+      <div className="mx-auto max-w-5xl">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
-          className="text-center mb-16"
+          transition={{ duration: 0.5 }}
+          className="text-center mb-12 max-w-xl mx-auto"
         >
-          <h2 className="font-display text-4xl md:text-5xl text-olive-dark font-bold mb-3">
-            {t('menuTitle')}
+          <Badge variant="accent" size="sm" className="mb-4">
+            {isAr ? 'بثلاث خطوات' : 'In three steps'}
+          </Badge>
+          <h2 className="text-3xl sm:text-4xl font-display font-bold tracking-tight">
+            {isAr ? 'كيف تشتغل لُقمة يُمّه؟' : 'How Loqmat Yummah works'}
           </h2>
-          <p className="text-olive-dark/70 text-lg">{t('menuSub')}</p>
-          <div className="w-24 h-1 bg-gradient-to-r from-gold to-olive mx-auto mt-4 rounded-full" />
         </motion.div>
 
-        {renderGroup(t('catMains'), grouped.mains)}
-        {renderGroup(t('catSalads'), grouped.salads)}
-        {renderGroup(t('catExtras'), grouped.extras)}
-      </div>
-    </section>
-  )
-}
+        <div className="grid md:grid-cols-3 gap-6 relative">
+          {/* Connecting line */}
+          <div aria-hidden className="hidden md:block absolute top-12 left-[16%] right-[16%] h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-// Gallery — placeholders using gradient tiles.
-// TODO(real-photos): drop real photos into /public/gallery/ and update this array.
-const galleryTiles = [
-  { id: 'g1', emoji: '🥬', label: 'ملوخية', gradient: 'from-emerald-700 via-emerald-500 to-lime-400' },
-  { id: 'g2', emoji: '🍅', label: 'محشي', gradient: 'from-red-600 via-orange-500 to-amber-400' },
-  { id: 'g3', emoji: '🍲', label: 'كمونية', gradient: 'from-amber-700 via-yellow-600 to-amber-400' },
-  { id: 'g4', emoji: '🥒', label: 'سلطة روب', gradient: 'from-sky-300 via-cyan-200 to-emerald-200' },
-  { id: 'g5', emoji: '🍆', label: 'سلطة أسود', gradient: 'from-purple-900 via-purple-700 to-fuchsia-500' },
-  { id: 'g6', emoji: '🫓', label: 'كسرة', gradient: 'from-amber-200 via-yellow-100 to-orange-200' },
-]
-
-const GallerySection: React.FC = () => {
-  const { lang } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
-  const [open, setOpen] = useState<string | null>(null)
-  const current = galleryTiles.find((g) => g.id === open)
-
-  return (
-    <section className="py-24 bg-olive-dark text-cream">
-      <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
-          className="text-center mb-12"
-        >
-          <h2 className="font-display text-4xl md:text-5xl font-bold mb-3">{t('galleryTitle')}</h2>
-          <p className="text-cream/70">{t('gallerySub')}</p>
-          <div className="w-24 h-1 bg-gradient-to-r from-gold to-cream mx-auto mt-4 rounded-full" />
-        </motion.div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {galleryTiles.map((g, i) => (
-            <motion.button
-              key={g.id}
-              initial={{ opacity: 0, scale: 0.92 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.05 }}
-              whileHover={{ scale: 1.03 }}
-              onClick={() => setOpen(g.id)}
-              className={`aspect-square rounded-3xl bg-gradient-to-br ${g.gradient} flex flex-col items-center justify-center shadow-xl focus:outline-none focus:ring-4 focus:ring-gold/50`}
-              aria-label={g.label}
+          {STEPS[lang].map(({ icon: Icon, title, desc }, i) => (
+            <motion.div
+              key={title}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.5, delay: i * 0.12 }}
+              className="relative text-center"
             >
-              <span className="text-6xl md:text-7xl">{g.emoji}</span>
-              <span className="mt-2 text-cream font-display text-lg drop-shadow">{g.label}</span>
-            </motion.button>
+              <div className="mx-auto w-24 h-24 mb-5 rounded-full glass-strong shadow-premium flex items-center justify-center relative">
+                <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-gradient-to-br from-gold-400 to-gold-600 text-white text-xs font-bold flex items-center justify-center shadow">
+                  {i + 1}
+                </span>
+                <Icon className="h-9 w-9 text-olive-700 dark:text-olive-300" />
+              </div>
+              <h3 className="font-display font-bold text-xl mb-2">{title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{desc}</p>
+            </motion.div>
           ))}
         </div>
       </div>
-
-      {/* Lightbox */}
-      {current && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setOpen(null)}
-        >
-          <button
-            onClick={() => setOpen(null)}
-            aria-label="Close"
-            className="absolute top-6 end-6 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className={`max-w-2xl w-full aspect-square rounded-3xl bg-gradient-to-br ${current.gradient} flex flex-col items-center justify-center shadow-2xl`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="text-[12rem] leading-none">{current.emoji}</span>
-            <span className="mt-4 text-cream font-display text-3xl">{current.label}</span>
-          </motion.div>
-        </div>
-      )}
     </section>
   )
 }
 
-const ContactSection: React.FC = () => {
+// ─── Join CTA ──────────────────────────────────────────────────────────────
+const JOIN_CARDS = {
+  ar: [
+    {
+      icon: ChefHat,
+      title: 'طبّاخة منزلية',
+      desc: 'افتحي مطبخك السحابي من بيتك. زوزو ترتّب التسجيل والمعدّات والتوصيل والمدفوعات.',
+      cta: 'سجّليني',
+      variant: 'accent' as const,
+    },
+    {
+      icon: Bike,
+      title: 'سائق توصيل',
+      desc: 'انضم لشبكتنا، خذ طلبات قريبة منك، ادفع لعائلتك بكرامة.',
+      cta: 'سجّلني',
+      variant: 'outline' as const,
+    },
+    {
+      icon: HeartHandshake,
+      title: 'برنامج الخير',
+      desc: 'وجبات مدعومة للطلبة، كبار السن، اللاجئين، والعمال — بعد التحقق.',
+      cta: 'تعرّفي أكثر',
+      variant: 'outline' as const,
+    },
+  ],
+  en: [
+    {
+      icon: ChefHat,
+      title: 'Home Cook',
+      desc: 'Open your cloud kitchen from home. ZuZu handles signup, equipment, delivery, and payments.',
+      cta: 'Sign me up',
+      variant: 'accent' as const,
+    },
+    {
+      icon: Bike,
+      title: 'Delivery Driver',
+      desc: 'Join our network. Take nearby orders. Provide for your family with dignity.',
+      cta: 'Sign me up',
+      variant: 'outline' as const,
+    },
+    {
+      icon: HeartHandshake,
+      title: 'Care Program',
+      desc: 'Subsidised meals for students, elders, refugees, and workers — after verification.',
+      cta: 'Learn more',
+      variant: 'outline' as const,
+    },
+  ],
+} as const
+
+const JoinSection: React.FC = () => {
   const { lang } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
+  const isAr = lang === 'ar'
   return (
-    <section className="py-24 bg-gradient-to-b from-cream-warm to-rose-50">
-      <div className="container mx-auto px-4 max-w-3xl text-center">
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
+    <section id="join" className="relative py-24 px-4 overflow-hidden">
+      <div aria-hidden className="absolute -top-40 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] blob-gold opacity-50" />
+      <div className="relative mx-auto max-w-6xl">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
-          className="font-display text-4xl md:text-5xl text-olive-dark font-bold mb-3"
+          transition={{ duration: 0.5 }}
+          className="text-center mb-12 max-w-2xl mx-auto"
         >
-          {t('contactTitle')}
-        </motion.h2>
-        <div className="w-24 h-1 bg-gradient-to-r from-gold to-olive mx-auto mb-10 rounded-full" />
+          <Badge variant="glow" size="sm" className="mb-4">
+            {isAr ? 'انضم إلينا' : 'Join us'}
+          </Badge>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold tracking-tight">
+            {isAr ? (
+              <>
+                كوني جزءاً من <span className="text-gradient-gold">العائلة</span>
+              </>
+            ) : (
+              <>
+                Become part of the <span className="text-gradient-gold">family</span>
+              </>
+            )}
+          </h2>
+          <p className="mt-3 text-muted-foreground text-base sm:text-lg leading-relaxed">
+            {isAr
+              ? 'طبّاخة، سائق، أو شريك خير — زوزو ترحّب بكم'
+              : 'Cook, driver, or partner-in-good — ZuZu welcomes you'}
+          </p>
+        </motion.div>
 
-        <div className="grid sm:grid-cols-3 gap-4 mb-10">
-          <div className="bg-white/70 backdrop-blur rounded-2xl p-5 border border-gold/20">
-            <Clock className="w-6 h-6 text-gold-dark mx-auto mb-2" />
-            <div className="text-olive-dark/80 text-sm">{t('hours')}</div>
-          </div>
-          <div className="bg-white/70 backdrop-blur rounded-2xl p-5 border border-gold/20">
-            <MapPin className="w-6 h-6 text-gold-dark mx-auto mb-2" />
-            <div className="text-olive-dark/80 text-sm">{t('location')}</div>
-          </div>
-          <div className="bg-white/70 backdrop-blur rounded-2xl p-5 border border-gold/20">
-            <Phone className="w-6 h-6 text-gold-dark mx-auto mb-2" />
-            <a href={`tel:+${WHATSAPP_NUMBER}`} className="text-olive-dark font-semibold tracking-wide" dir="ltr">
-              055 313 4696
-            </a>
-          </div>
+        <div className="grid md:grid-cols-3 gap-5">
+          {JOIN_CARDS[lang].map(({ icon: Icon, title, desc, cta, variant }, i) => (
+            <motion.div
+              key={title}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.5, delay: i * 0.08 }}
+            >
+              <Card variant="premium" className="h-full flex flex-col">
+                <CardContent className="p-7 flex flex-col flex-1">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gold-300 to-gold-500 flex items-center justify-center mb-5 shadow-md">
+                    <Icon className="h-7 w-7 text-white" />
+                  </div>
+                  <h3 className="font-display font-bold text-2xl mb-3">{title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1 mb-5">{desc}</p>
+                  <Button variant={variant} className="rounded-full w-full group" asChild>
+                    <a href="#zuzu-hero">
+                      {cta}
+                      <ArrowRight className={`h-4 w-4 transition-transform ${isAr ? 'group-hover:-translate-x-0.5 rotate-180' : 'group-hover:translate-x-0.5'}`} />
+                    </a>
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
-
-        <a
-          href={buildWhatsAppLink()}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-3 px-10 py-5 rounded-full bg-gradient-to-l from-olive-dark to-olive text-cream font-display text-xl shadow-2xl shadow-olive/40 hover:scale-[1.03] transition focus:outline-none focus:ring-4 focus:ring-olive/30"
-        >
-          <MessageCircle className="w-6 h-6" />
-          {t('heroOrderCta')}
-        </a>
       </div>
     </section>
   )
 }
 
-const Footer: React.FC = () => {
-  const { lang } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
-  return (
-    <footer className="bg-olive-dark text-cream py-16">
-      <div className="container mx-auto px-4 text-center">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true, margin: '-100px' }}
-          transition={{ duration: 1.2 }}
-          className="max-w-xl mx-auto"
-        >
-          <Heart className="w-10 h-10 mx-auto text-rose-300 heartbeat mb-4" fill="currentColor" />
-          <p className="font-display text-lg md:text-xl leading-relaxed whitespace-pre-line">
-            {t('dedication')}
-          </p>
-          <div className="mt-8 pt-6 border-t border-cream/10 text-cream/50 text-sm">
-            © {new Date().getFullYear()} {t('brand')} · {t('slogan')}
-          </div>
-        </motion.div>
-      </div>
-    </footer>
-  )
-}
-
-const FloatingMamaButton: React.FC = () => {
-  const { lang } = useLanguage()
-  const t = (k: TKey) => T[k][lang]
-  const [open, setOpen] = useState(false)
-
-  return (
-    <>
-      <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 2.5, type: 'spring' }}
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 start-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full bg-gradient-to-l from-gold to-gold-dark text-olive-dark font-display font-semibold shadow-2xl shadow-gold/40 hover:scale-105 transition focus:outline-none focus:ring-4 focus:ring-gold/30"
-        aria-label={t('chatWithMama')}
-      >
-        <Sparkles className="w-5 h-5" />
-        {t('chatWithMama')}
-      </motion.button>
-
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-6"
-          onClick={() => setOpen(false)}
-        >
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="w-full md:max-w-3xl h-[88vh] md:h-[80vh] bg-cream rounded-t-3xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3 bg-olive-dark text-cream">
-              <div className="flex items-center gap-2 font-display">
-                <Sparkles className="w-4 h-4 text-gold" />
-                {t('chatWithMama')}
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label={t('closeChat')}
-                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto bg-white">
-              <Suspense fallback={<div className="p-8 text-center text-olive-dark/60">جاري التحميل…</div>}>
-                <ZuZuAgent />
-              </Suspense>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </>
-  )
-}
-
-// ─── Page ───────────────────────────────────────────────────────────────────
-
+// ─── Page ──────────────────────────────────────────────────────────────────
 const LandingPage: React.FC = () => {
+  const { lang } = useLanguage()
+  const isAr = lang === 'ar'
+
+  // Sync dir attribute on body
+  React.useEffect(() => {
+    document.body.dir = isAr ? 'rtl' : 'ltr'
+    document.documentElement.lang = lang
+  }, [isAr, lang])
+
   return (
-    <div className="min-h-screen bg-cream text-olive-dark font-sans">
-      <Header />
+    <div className="min-h-screen bg-background text-foreground antialiased">
+      <SiteHeader />
       <main>
         <ZuzuVoiceHero />
-        <StorySection />
-        <MenuSection />
-        <GallerySection />
-        <ContactSection />
+        <FeaturesGrid />
+        <HowItWorks />
+        <JoinSection />
       </main>
-      <Footer />
-      <FloatingMamaButton />
+      <SiteFooter />
     </div>
   )
 }

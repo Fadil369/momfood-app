@@ -1,19 +1,47 @@
 /**
- * ZuzuVoiceHero — hero section with full Phase 2 voice loop.
+ * ZuzuVoiceHero — premium Phase 2.5 hero section.
  *
- *   - Tap orb during 'speaking' → barge-in (stop ZuZu, start listening)
- *   - Tap orb during 'idle' → start listening
- *   - VAD auto-stops on silence → STT → chat (with tools) → TTS
- *   - Session id persists in localStorage for cross-turn memory
+ * Layout:
+ *   ┌──────────────────────────────────────┐
+ *   │  [trust badges]   I'm ZuZu           │
+ *   │                                       │
+ *   │           [ ORB - 340px ]             │
+ *   │             status pill                │
+ *   │                                       │
+ *   │   [ Suggestion chip Grid ]            │
+ *   │   [ Live caption Card    ]            │
+ *   │   [ Mute / Lang / History ]           │
+ *   └──────────────────────────────────────┘
  */
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Languages, Volume2, VolumeX, Sparkles } from 'lucide-react'
+import {
+  Volume2,
+  VolumeX,
+  Sparkles,
+  History,
+  MessageCircle,
+  Loader2,
+  Mic as MicIcon,
+  ShieldCheck,
+} from 'lucide-react'
 import { ZuzuOrb, type ZuzuOrbState } from '@/components/voice/ZuzuOrb'
 import { useVoiceCapture } from '@/hooks/useVoiceCapture'
 import { useZuzuChat } from '@/hooks/useZuzuChat'
 import { useLanguage } from '@/contexts/LanguageContext'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const GREETINGS = {
   ar: 'أهلين بكِ في لُقْمَة يُمّه. أنا زوزو، مساعدتك. اضغطي على الدائرة وكلميني — أنا أسمعك.',
@@ -37,33 +65,30 @@ const STATE_LABELS = {
 
 const SUGGESTIONS = {
   ar: [
-    'وش عندكم اليوم؟',
-    'أبغى أسجل مطبخي',
-    'عندكم كبسة بالرياض؟',
-    'أبغى أكلم د. محمد',
+    { icon: Sparkles, text: 'وش عندكم اليوم؟' },
+    { icon: MessageCircle, text: 'أبغى أسجل مطبخي' },
+    { icon: Sparkles, text: 'عندكم كبسة بالرياض؟' },
+    { icon: MessageCircle, text: 'أبغى أكلم د. محمد' },
   ],
   en: [
-    'What do you have today?',
-    'I want to register my kitchen',
-    'Do you have kabsa in Riyadh?',
-    'I want to talk to Dr. Mohammed',
+    { icon: Sparkles, text: 'What do you have today?' },
+    { icon: MessageCircle, text: 'I want to register my kitchen' },
+    { icon: Sparkles, text: 'Do you have kabsa in Riyadh?' },
+    { icon: MessageCircle, text: 'I want to talk to Dr. Mohammed' },
   ],
 } as const
 
 export const ZuzuVoiceHero: React.FC = () => {
-  const { lang, toggle: toggleLang } = useLanguage()
+  const { lang } = useLanguage()
   const chat = useZuzuChat()
   const [muted, setMuted] = useState(true)
   const [greeted, setGreeted] = useState(false)
+  const isAr = lang === 'ar'
 
-  // VAD auto-stop → process audio
   const onAutoStop = useCallback(
     (blob: Blob | null) => {
-      if (blob) {
-        chat.processAudio(blob, lang).catch(() => {})
-      } else {
-        chat.setMode('idle')
-      }
+      if (blob) chat.processAudio(blob, lang).catch(() => {})
+      else chat.setMode('idle')
     },
     [chat, lang],
   )
@@ -84,7 +109,6 @@ export const ZuzuVoiceHero: React.FC = () => {
     ? 'speaking'
     : 'idle'
 
-  // Greeting on first unmute
   useEffect(() => {
     if (!muted && !greeted) {
       setGreeted(true)
@@ -97,29 +121,24 @@ export const ZuzuVoiceHero: React.FC = () => {
       setMuted(false)
       return
     }
-
-    // Barge-in: tap while speaking → stop and start listening
     if (chat.mode === 'speaking') {
       chat.stopSpeaking()
       try {
         await mic.start()
       } catch {
-        // mic denied
+        /* mic denied */
       }
       return
     }
-
     if (chat.mode === 'thinking') return
-
     if (mic.isRecording) {
-      // Manual stop (user tapped to cut short before VAD)
       const blob = await mic.stop()
       if (blob) await chat.processAudio(blob, lang)
     } else {
       try {
         await mic.start()
       } catch {
-        // mic denied
+        /* mic denied */
       }
     }
   }
@@ -127,7 +146,6 @@ export const ZuzuVoiceHero: React.FC = () => {
   const onSuggestion = async (text: string) => {
     if (muted) {
       setMuted(false)
-      // Defer 200ms so greeting starts; then send suggestion
       setTimeout(() => chat.sendText(text, lang).catch(() => {}), 200)
       return
     }
@@ -136,175 +154,285 @@ export const ZuzuVoiceHero: React.FC = () => {
   }
 
   const visualLevel = mic.isRecording ? mic.level : chat.audioLevel
+  const orbSize = typeof window !== 'undefined' && window.innerWidth < 480 ? 280 : 340
 
   return (
-    <section
-      id="zuzu-hero"
-      className="relative min-h-[100svh] flex flex-col items-center justify-center overflow-hidden px-4 py-16"
-      style={{
-        background:
-          'radial-gradient(ellipse at top, #faf6ee 0%, #f5ead4 35%, #e8dcc0 100%)',
-      }}
-    >
-      {/* Decorative ambient glows */}
-      <div
-        aria-hidden
-        className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-60 blur-3xl"
-        style={{ background: 'radial-gradient(circle, #c9a96155 0%, transparent 70%)' }}
-      />
-      <div
-        aria-hidden
-        className="absolute -bottom-32 -right-32 w-[28rem] h-[28rem] rounded-full opacity-50 blur-3xl"
-        style={{ background: 'radial-gradient(circle, #e8b4a055 0%, transparent 70%)' }}
-      />
-
-      {/* Top controls */}
-      <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
-        <button
-          onClick={toggleLang}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 backdrop-blur-md border border-white/60 shadow text-sm font-medium text-olive-dark hover:bg-white transition"
-        >
-          <Languages className="w-4 h-4" />
-          {lang === 'ar' ? 'EN' : 'AR'}
-        </button>
-        <button
-          onClick={() => setMuted((m) => !m)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 backdrop-blur-md border border-white/60 shadow text-sm font-medium text-olive-dark hover:bg-white transition"
-        >
-          {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          {muted
-            ? lang === 'ar'
-              ? 'الصوت مكتوم'
-              : 'Muted'
-            : lang === 'ar'
-            ? 'مفتوح'
-            : 'On'}
-        </button>
-      </div>
-
-      {/* Brand line */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="text-center mb-8 z-10"
+    <TooltipProvider delayDuration={300}>
+      <section
+        id="zuzu-hero"
+        dir={isAr ? 'rtl' : 'ltr'}
+        className="relative min-h-[100svh] flex flex-col items-center justify-center overflow-hidden px-4 pt-24 pb-16"
       >
-        <p className="text-xs uppercase tracking-[0.4em] text-olive/70 mb-3 font-medium">
-          {lang === 'ar' ? 'لُقْمَة يُمّه' : 'Loqmat Yummah'}
-        </p>
-        <h1
-          className="text-4xl sm:text-5xl md:text-6xl font-display font-bold text-olive-dark leading-tight"
-          style={{ direction: lang === 'ar' ? 'rtl' : 'ltr' }}
+        {/* Background layers */}
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-cream-50 via-background to-cream-100/40 dark:from-olive-900 dark:via-background dark:to-olive-800/40" />
+        <div className="absolute inset-0 -z-10 bg-grid opacity-60" />
+        <div aria-hidden className="absolute -top-32 -left-32 w-[28rem] h-[28rem] blob-gold" />
+        <div aria-hidden className="absolute -bottom-32 -right-32 w-[32rem] h-[32rem] blob-olive" />
+        <div aria-hidden className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[20rem] h-[20rem] blob-rose opacity-40" />
+
+        {/* Top trust badges */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="flex flex-wrap items-center justify-center gap-2 mb-6"
         >
-          {lang === 'ar' ? (
-            <>
-              أنا <span className="text-gold">زوزو</span>
-            </>
-          ) : (
-            <>
-              I'm <span className="text-gold">ZuZu</span>
-            </>
-          )}
-        </h1>
-        <p className="mt-3 text-base sm:text-lg text-olive/80 max-w-xl mx-auto">
-          {lang === 'ar'
-            ? 'سُمّيت على أُمّ د. محمد 💚 — حاضنة الطبّاخات، صوت لُقمتك الدافية'
-            : "Named after Dr. Mohammed's mother 💚 — the voice of warm home cooking"}
-        </p>
-      </motion.div>
+          <Badge variant="glow" size="sm" className="font-medium">
+            <Sparkles className="h-3 w-3" />
+            {isAr ? 'مدعوم بـ Cloudflare Workers AI' : 'Powered by Cloudflare Workers AI'}
+          </Badge>
+          <Badge variant="outline" size="sm" className="font-medium">
+            <ShieldCheck className="h-3 w-3 text-olive-600" />
+            {isAr ? 'خصوصية كاملة' : 'Privacy-first'}
+          </Badge>
+        </motion.div>
 
-      {/* The Orb */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.7, ease: 'easeOut' }}
-        className="z-10"
-      >
-        <ZuzuOrb
-          state={orbState}
-          level={visualLevel}
-          bars={mic.bars}
-          onTap={onOrbTap}
-          size={typeof window !== 'undefined' && window.innerWidth < 480 ? 280 : 340}
-          labelAr={STATE_LABELS.ar[orbState]}
-          labelEn={STATE_LABELS.en[orbState]}
-          lang={lang}
-        />
-      </motion.div>
+        {/* Headline */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          className="text-center mb-10 max-w-2xl"
+        >
+          <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground mb-3 font-medium">
+            {isAr ? 'لُقْمَة يُمّه' : 'Loqmat Yummah'}
+          </p>
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold leading-[1.05] tracking-tight">
+            {isAr ? (
+              <>
+                أنا <span className="text-gradient-gold">زوزو</span>
+              </>
+            ) : (
+              <>
+                I'm <span className="text-gradient-gold">ZuZu</span>
+              </>
+            )}
+          </h1>
+          <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            {isAr
+              ? 'سُمّيت على أُمّ د. محمد 💚 — صوتٌ دافئ يربط الطبّاخات المنزليات بزبائنهم.'
+              : "Named after Dr. Mohammed's mother 💚 — a warm voice connecting home cooks with their customers."}
+          </p>
+        </motion.div>
 
-      {/* Captions */}
-      <div className="mt-20 z-10 w-full max-w-2xl px-2">
-        <AnimatePresence mode="wait">
-          {(chat.transcript || chat.reply) && (
+        {/* The Orb */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.7, delay: 0.2, ease: 'easeOut' }}
+          className="relative"
+        >
+          <ZuzuOrb
+            state={orbState}
+            level={visualLevel}
+            bars={mic.bars}
+            onTap={onOrbTap}
+            size={orbSize}
+            labelAr={STATE_LABELS.ar[orbState]}
+            labelEn={STATE_LABELS.en[orbState]}
+            lang={lang}
+          />
+        </motion.div>
+
+        {/* Caption / Suggestions / Controls */}
+        <div className="mt-24 w-full max-w-2xl">
+          {/* Live caption card */}
+          <AnimatePresence mode="wait">
+            {(chat.transcript || chat.reply) && (
+              <motion.div
+                key={chat.reply || chat.transcript}
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                transition={{ duration: 0.35 }}
+              >
+                <Card variant="glass" className="overflow-hidden">
+                  <CardContent className="p-5 space-y-3">
+                    {chat.transcript && (
+                      <div className="flex items-start gap-3">
+                        <div className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                          <MicIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-0.5">
+                            {isAr ? 'أنت' : 'You'}
+                          </p>
+                          <p className="text-sm text-foreground/80 leading-relaxed">
+                            {chat.transcript}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {chat.reply && (
+                      <div className="flex items-start gap-3">
+                        <div className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-gradient-to-br from-gold-300 to-gold-600 flex items-center justify-center shadow-sm">
+                          <Sparkles className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[10px] uppercase tracking-wider text-gold-700 dark:text-gold-300 font-semibold mb-0.5">
+                            {isAr ? 'زوزو' : 'ZuZu'}
+                          </p>
+                          <p className="text-base text-foreground leading-relaxed">
+                            {chat.reply}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {chat.mode === 'thinking' && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        {isAr ? 'زوزو تفكر…' : 'ZuZu is thinking…'}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Suggestion chips — only when idle */}
+          {!chat.transcript && !chat.reply && (
             <motion.div
-              key={chat.reply || chat.transcript}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.4 }}
-              className="rounded-2xl bg-white/75 backdrop-blur-xl border border-white/60 shadow-xl p-5"
-              style={{ direction: lang === 'ar' ? 'rtl' : 'ltr' }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+              className="flex flex-wrap gap-2 justify-center"
             >
-              {chat.transcript && (
-                <p className="text-sm text-olive/70 mb-2">
-                  <span className="font-medium">{lang === 'ar' ? 'أنت:' : 'You:'}</span>{' '}
-                  {chat.transcript}
-                </p>
-              )}
-              {chat.reply && (
-                <p className="text-lg text-olive-dark leading-relaxed">
-                  <span className="font-medium text-gold">
-                    {lang === 'ar' ? 'زوزو:' : 'ZuZu:'}
-                  </span>{' '}
-                  {chat.reply}
-                </p>
-              )}
+              {SUGGESTIONS[lang].map(({ icon: Icon, text }) => (
+                <Button
+                  key={text}
+                  variant="glass"
+                  size="sm"
+                  onClick={() => onSuggestion(text)}
+                  disabled={chat.mode === 'thinking'}
+                  className="rounded-full text-sm hover:scale-[1.02] hover:border-accent"
+                >
+                  <Icon className="h-3.5 w-3.5 text-gold-600" />
+                  {text}
+                </Button>
+              ))}
             </motion.div>
           )}
-        </AnimatePresence>
 
-        {/* Suggestion chips when idle */}
-        {!chat.transcript && !chat.reply && (
-          <div className="mt-8 flex flex-wrap gap-2 justify-center">
-            {SUGGESTIONS[lang].map((s) => (
-              <button
-                key={s}
-                onClick={() => onSuggestion(s)}
-                disabled={chat.mode === 'thinking'}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 backdrop-blur-md border border-gold/30 text-sm text-olive-dark hover:bg-white hover:border-gold transition disabled:opacity-40"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-gold" />
-                {s}
-              </button>
-            ))}
+          {/* Footer controls */}
+          <div className="mt-8 flex items-center justify-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setMuted((m) => !m)}
+                  className="rounded-full"
+                  aria-label={muted ? 'Unmute' : 'Mute'}
+                >
+                  {muted ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4 text-gold-600" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {muted
+                  ? isAr
+                    ? 'فعّلي الصوت'
+                    : 'Enable sound'
+                  : isAr
+                  ? 'الصوت مفعل'
+                  : 'Sound on'}
+              </TooltipContent>
+            </Tooltip>
+
+            <Sheet>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="rounded-full"
+                      aria-label="History"
+                      disabled={chat.history.length === 0}
+                    >
+                      <History className="h-4 w-4" />
+                    </Button>
+                  </SheetTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isAr ? 'سجل المحادثة' : 'Conversation history'}
+                </TooltipContent>
+              </Tooltip>
+
+              <SheetContent side={isAr ? 'left' : 'right'}>
+                <SheetHeader>
+                  <SheetTitle className="font-display">
+                    {isAr ? 'سجل المحادثة مع زوزو' : 'Conversation with ZuZu'}
+                  </SheetTitle>
+                </SheetHeader>
+                <ScrollArea className="mt-4 h-[calc(100vh-8rem)] pr-2">
+                  <div className="space-y-3 pb-12">
+                    {chat.history.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        {isAr ? 'لا توجد محادثة بعد' : 'No conversation yet'}
+                      </p>
+                    ) : (
+                      chat.history.map((turn, i) => (
+                        <div
+                          key={`${turn.ts}-${i}`}
+                          className={
+                            turn.role === 'user'
+                              ? 'bg-muted/60 rounded-2xl rounded-br-sm p-3 text-sm ms-auto max-w-[85%]'
+                              : 'bg-gradient-to-br from-gold-50 to-cream-50 dark:from-gold-700/10 dark:to-olive-900/40 border border-gold-200/50 dark:border-gold-700/30 rounded-2xl rounded-bl-sm p-3 text-sm max-w-[85%]'
+                          }
+                        >
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                            {turn.role === 'user'
+                              ? isAr
+                                ? 'أنت'
+                                : 'You'
+                              : 'ZuZu'}
+                          </p>
+                          <p className="leading-relaxed">{turn.text}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </SheetContent>
+            </Sheet>
+
+            <div className="h-5 w-px bg-border mx-1" />
+
+            <p className="text-xs text-muted-foreground">
+              {muted
+                ? isAr
+                  ? '🔇 اضغطي على الدائرة'
+                  : '🔇 Tap the orb'
+                : isAr
+                ? '🎙️ تتوقف تلقائياً عند الصمت'
+                : '🎙️ Auto-stops on silence'}
+            </p>
           </div>
-        )}
 
-        {/* Error */}
-        {(mic.error || chat.error) && (
-          <div className="mt-4 text-center text-sm text-rose-600/80">
-            {mic.error?.includes('denied') || mic.error === 'mic_denied'
-              ? lang === 'ar'
-                ? 'يرجى السماح بالميكروفون لتحدثي مع زوزو 🎙️'
-                : 'Please allow microphone access 🎙️'
-              : mic.error || chat.error}
-          </div>
-        )}
-
-        {/* Hint */}
-        {!chat.transcript && !chat.reply && (
-          <p className="mt-6 text-center text-xs text-olive/50">
-            {muted
-              ? lang === 'ar'
-                ? '🔇 اضغطي على الدائرة لتفعيل الصوت'
-                : '🔇 Tap the orb to unmute'
-              : lang === 'ar'
-              ? '🎙️ تتوقف تلقائياً عند الصمت • اضغطي وقت كلام زوزو لمقاطعتها'
-              : '🎙️ Auto-stops on silence • Tap while ZuZu speaks to interrupt'}
-          </p>
-        )}
-      </div>
-    </section>
+          {/* Error toast strip */}
+          {(mic.error || chat.error) && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 text-center"
+            >
+              <Badge variant="destructive" size="lg" className="font-normal">
+                {mic.error?.includes('denied') || mic.error === 'mic_denied'
+                  ? isAr
+                    ? 'يرجى السماح بالميكروفون 🎙️'
+                    : 'Please allow microphone access 🎙️'
+                  : mic.error || chat.error}
+              </Badge>
+            </motion.div>
+          )}
+        </div>
+      </section>
+    </TooltipProvider>
   )
 }
 
