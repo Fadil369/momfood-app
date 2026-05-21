@@ -38,7 +38,7 @@ NODE_VERSION = "20"
 [[d1_databases]]
 binding = "DB"
 database_name = "momfood-zuzu"
-database_id = "REPLACE_WITH_D1_ID_AFTER_CREATE"
+database_id = "ae43cf60-5517-44b0-9373-299ff1e68167"
 migrations_dir = "migrations"
 
 # ─── R2 bucket (verification docs + dish photos) ────────────────────────────
