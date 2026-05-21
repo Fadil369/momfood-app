@@ -24,7 +24,6 @@ import {
   MessageCircle,
   Loader2,
   Mic as MicIcon,
-  ShieldCheck,
 } from 'lucide-react'
 import { ZuzuOrb, type ZuzuOrbState } from '@/components/voice/ZuzuOrb'
 import { useVoiceCapture } from '@/hooks/useVoiceCapture'
@@ -169,49 +168,16 @@ export const ZuzuVoiceHero: React.FC = () => {
         <div aria-hidden className="absolute -bottom-32 -right-32 w-[32rem] h-[32rem] blob-olive" />
         <div aria-hidden className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[20rem] h-[20rem] blob-rose opacity-40" />
 
-        {/* Top trust badges */}
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="flex flex-wrap items-center justify-center gap-2 mb-6"
-        >
-          <Badge variant="glow" size="sm" className="font-medium">
-            <Sparkles className="h-3 w-3" />
-            {isAr ? 'مدعوم بـ Cloudflare Workers AI' : 'Powered by Cloudflare Workers AI'}
-          </Badge>
-          <Badge variant="outline" size="sm" className="font-medium">
-            <ShieldCheck className="h-3 w-3 text-olive-600" />
-            {isAr ? 'خصوصية كاملة' : 'Privacy-first'}
-          </Badge>
-        </motion.div>
-
-        {/* Headline */}
+        {/* Headline — simple, just the brand */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.15 }}
           className="text-center mb-10 max-w-2xl"
         >
-          <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground mb-3 font-medium">
-            {isAr ? 'لُقْمَة يُمّه' : 'Loqmat Yummah'}
-          </p>
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold leading-[1.05] tracking-tight">
-            {isAr ? (
-              <>
-                أنا <span className="text-gradient-gold">زوزو</span>
-              </>
-            ) : (
-              <>
-                I'm <span className="text-gradient-gold">ZuZu</span>
-              </>
-            )}
+            <span className="text-gradient-gold">MoM Food</span>
           </h1>
-          <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            {isAr
-              ? 'سُمّيت على أُمّ د. محمد 💚 — صوتٌ دافئ يربط الطبّاخات المنزليات بزبائنهم.'
-              : "Named after Dr. Mohammed's mother 💚 — a warm voice connecting home cooks with their customers."}
-          </p>
         </motion.div>
 
         {/* The Orb */}
