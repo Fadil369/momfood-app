@@ -10,8 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cloudflare/workers-types": "^4.20260520.1",
+    "@gravatar/js": "^1.1.1",
     "@hookform/resolvers": "^3.3.4",
+    "ai": "^6.0.188",
     "class-variance-authority": "^0.7.0",
+    "cloudflare": "^6.2.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "framer-motion": "^11.2.10",
@@ -20,6 +24,8 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.51.4",
     "react-router-dom": "^6.23.1",
+    "react-speech-recognition": "^4.0.1",
+    "react-voice-visualizer": "^2.1.0",
     "recharts": "^2.12.7",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
