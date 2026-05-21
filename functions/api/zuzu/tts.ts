@@ -1,14 +1,23 @@
 // POST /api/zuzu/tts — server-side proxy to ElevenLabs TTS
 // Keeps API key secret. Returns audio/mpeg stream.
 //
-// Body: { text: string, voice_id?: string, model_id?: string }
-// Default voice is Adam (multilingual). Override per request.
+// Body: { text: string, voice_id?: string, model_id?: string, lang?: 'ar'|'en' }
+//
+// Default voice for ZuZu: Jessica (cgSgspJ2msm6clMCkdW9) — a warm,
+// natural, conversational female voice from ElevenLabs. Pairs well with
+// `eleven_multilingual_v2` for Arabic and English.
+//
+// Voice settings tuned for a warm "khalti ZuZu" feel:
+//   stability=0.50      → a touch of natural variation, not robotic
+//   similarity_boost=0.80 → keep her identity locked-in across turns
+//   style=0.30          → expressive but never theatrical
+//   speaker_boost=true  → clean low-noise output
 
 import { fail } from '../../_lib/response'
 import type { Env } from '../../_middleware'
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-const DEFAULT_VOICE = 'EXAVITQu4vr4xnSDxMaL' // Sarah — warm female, multilingual
+const ZUZU_VOICE = 'cgSgspJ2msm6clMCkdW9' // Jessica — warm, natural, conversational
 const DEFAULT_MODEL = 'eleven_multilingual_v2'
 
 export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
@@ -27,7 +36,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   if (!text) return fail('text required', 400, 'BAD_INPUT')
   if (text.length > 2000) return fail('text too long (max 2000 chars)', 400, 'TOO_LONG')
 
-  const voiceId = body.voice_id ?? DEFAULT_VOICE
+  const voiceId = body.voice_id ?? ZUZU_VOICE
   const modelId = body.model_id ?? DEFAULT_MODEL
 
   const upstream = await fetch(
@@ -43,9 +52,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
         text,
         model_id: modelId,
         voice_settings: {
-          stability: 0.55,
-          similarity_boost: 0.75,
-          style: 0.2,
+          stability: 0.50,
+          similarity_boost: 0.80,
+          style: 0.30,
           use_speaker_boost: true,
         },
       }),
