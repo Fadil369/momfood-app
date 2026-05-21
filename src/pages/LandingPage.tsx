@@ -22,60 +22,88 @@ import { useLanguage } from '@/contexts/LanguageContext'
 const ZuZuAgent = lazy(() => import('@/ai/ZuZuAgent'))
 
 // ─── i18n helpers ───────────────────────────────────────────────────────────
+// لُقْمَة يُمّه — Cloud Kitchen Incubator, hosted by ZuZu (the agent named after Mama 💚)
 const T = {
   brand: { ar: 'لُقْمَة يُمّه', en: 'Loqmat Yummah' },
+  tagline: { ar: 'حاضنة المطابخ السحابية، تديرها زوزو', en: 'A cloud kitchen incubator — hosted by ZuZu' },
   bismillah: { ar: 'بسم الله ما شاء الله', en: 'In the name of God' },
   slogan: {
     ar: 'من حبوباتنا سرّ طعم بلادنا',
-    en: "From our grandmothers' hands, the secret of our homeland's taste",
+    en: "From our grandmothers' hands — the secret of our homeland's taste",
   },
-  heroLine1: { ar: 'من يدِ يُمّه', en: 'From Mother\'s Hands' },
-  heroLine2: { ar: '… إلى سفرتك', en: '… to Your Table' },
+
+  // ZuZu hero
+  zuzuGreet: { ar: 'أهلين، أنا زوزو 👋', en: "Hi, I'm ZuZu 👋" },
+  heroLine1: { ar: 'أنا زوزو — مساعدتك في', en: "I'm ZuZu — your host at" },
+  heroLine2: { ar: 'لُقْمَة يُمّه', en: 'Loqmat Yummah' },
   heroSub: {
-    ar: 'لُقمة هنية ودافية، مطبوخة على نار هادية بحب',
-    en: 'A warm, loving bite — slow-cooked the way mama does',
+    ar: 'منصة بسم أمي — تحضن الطباخات، توصل اللُّقمة الدافية لبيتك، وتفتح أبواب الرزق بأيدي ماهرة.',
+    en: "A platform named after my mother — incubating home cooks, delivering warm bites to your door, opening doors of livelihood for skilled hands.",
   },
-  orderWA: { ar: 'اطلبي على واتساب', en: 'Order on WhatsApp' },
-  browseMenu: { ar: 'تصفّح القائمة', en: 'Browse the Menu' },
+  heroVoiceCta: { ar: '🎙️ تكلّم مع زوزو', en: '🎙️ Talk to ZuZu' },
+  heroOrderCta: { ar: 'اطلبي طعام', en: 'Order Food' },
+  heroJoinCta: { ar: 'انضمي كطبّاخة', en: 'Join as a Cook' },
 
-  storyTitle: { ar: 'حكايتنا', en: 'Our Story' },
-  story1Title: { ar: 'حبوبات الجدّات', en: "Grandmothers' Seeds" },
+  // ZuZu capabilities strip
+  capsTitle: { ar: 'زوزو تفعل كل شيء', en: 'ZuZu handles everything' },
+  capsSub: { ar: 'وكيلٌ ذكيّ، يتكلّم ويسمع، ويُنسّق كأنّه واحد من العيلة', en: 'A smart, voice-first agent who feels like family' },
+  cap1: { ar: '🛒 يأخذ طلبات العملاء بالصوت', en: '🛒 Takes customer orders by voice' },
+  cap2: { ar: '👩\u200d🍳 يسجّل المطابخ والشركاء', en: '👩\u200d🍳 Onboards kitchens & partners' },
+  cap3: { ar: '🛵 ينسّق مع السائقين', en: '🛵 Coordinates with drivers' },
+  cap4: { ar: '💳 يتابع المدفوعات والفواتير', en: '💳 Tracks payments & invoices' },
+  cap5: { ar: '🪪 يتحقّق من الهويات بسرّية', en: '🪪 Verifies identities privately' },
+  cap6: { ar: '🤲 يساعد الأسر المحتاجة', en: '🤲 Supports families in need' },
+
+  // Story (now about the platform + Mama)
+  storyTitle: { ar: 'لماذا زوزو؟', en: 'Why ZuZu?' },
+  story1Title: { ar: 'الاسم', en: 'The Name' },
   story1Body: {
-    ar: 'حبّات من ذاكرة الجدّات، توارثناها كما الدعاء — يدٌ بعد يد، قلبٌ بعد قلب.',
-    en: 'Seeds from generations of grandmothers, passed down like a prayer — hand to hand, heart to heart.',
+    ar: 'زوزو هو اسم أمي. كل ابتسامة في هذه المنصة، وكل لُقمة دافية تصل إليك، اسمها يحملها.',
+    en: "ZuZu is my mother's name. Every smile on this platform, every warm bite reaching you, carries her name.",
   },
-  story2Title: { ar: 'يدُ يُمّه', en: 'Mother\'s Hand' },
+  story2Title: { ar: 'الحاضنة', en: 'The Incubator' },
   story2Body: {
-    ar: 'يدٌ تعرف الموازين بلا ميزان، تذوّق بلا ملعقة، وتطبخ بالحب قبل البهار.',
-    en: 'Hands that measure without scales, taste without spoons, and season with love before spice.',
+    ar: 'نحتضن الطبّاخات في بيوتهن — معدّات، تدريب، توصيل، ومنصة دفع. الحبوبة تطبخ، ونحن نتكفّل بالباقي.',
+    en: 'We incubate home cooks — equipment, training, delivery, and payments. She cooks; we handle the rest.',
   },
-  story3Title: { ar: 'سفرتك', en: 'Your Table' },
+  story3Title: { ar: 'الوكيل الذكي', en: 'The Agent' },
   story3Body: {
-    ar: 'تصل إليكم دافية كأنّها خرجت للتوّ من نار يُمّه — لُقمة بلون البيت ورائحته.',
-    en: "Arriving warm — as if straight from mama's stove — a bite that smells and tastes of home.",
+    ar: 'زوزو — الوكيل — يستقبلك بصوته، يأخذ طلبك، يتابع طبخه، ويُحضره دافياً لباب بيتك. كأنه واحد من العيلة.',
+    en: 'ZuZu — the agent — greets you with her voice, takes your order, watches it cook, and delivers it warm. Like family.',
   },
 
-  menuTitle: { ar: 'قائمتنا', en: 'Our Menu' },
-  menuSub: { ar: 'كل طبق يحكي قصة', en: 'Every dish tells a story' },
+  menuTitle: { ar: 'من مطابخنا اليوم', en: "From Today's Kitchens" },
+  menuSub: { ar: 'كل طبق يحكي قصة — وزوزو توصلها لك', en: 'Every dish tells a story — ZuZu delivers it to you' },
   catMains: { ar: 'الأطباق الرئيسية', en: 'Main Dishes' },
   catSalads: { ar: 'السلطات', en: 'Salads' },
   catExtras: { ar: 'الإضافات', en: 'Extras' },
   riyal: { ar: 'ريال', en: 'SAR' },
-  orderItem: { ar: 'اطلب هذا الطبق', en: 'Order this dish' },
+  orderItem: { ar: 'اطلب من زوزو', en: 'Order via ZuZu' },
 
-  galleryTitle: { ar: 'من مطبخ يُمّه', en: "From Mama's Kitchen" },
+  galleryTitle: { ar: 'من مطابخ يُمّه', en: "From Mama's Kitchens" },
   gallerySub: { ar: 'بصمات الحب في كل صحن', en: 'Fingerprints of love in every plate' },
 
-  contactTitle: { ar: 'تواصلي معنا', en: 'Contact Us' },
-  hours: { ar: 'نفتح بحبّ كل يوم', en: 'Open with love, every day' },
+  // Partner programs (incubator)
+  partnersTitle: { ar: 'انضمي إلى عائلة لُقْمَة يُمّه', en: 'Join the Loqmat Yummah Family' },
+  partnersSub: { ar: 'سواء كنتِ طبّاخة، سائق، أو شريك خير — زوزو ترحّب بكم', en: 'Cook, driver, or partner-in-good — ZuZu welcomes you' },
+  cookCard: { ar: 'طبّاخة منزلية', en: 'Home Cook' },
+  cookDesc: { ar: 'حبوبتك تطبخ من بيتها، ونحن نوصّل وندفع لها. زوزو ترتّب كل شيء.', en: 'She cooks from home; we deliver and pay her. ZuZu handles everything.' },
+  driverCard: { ar: 'سائق توصيل', en: 'Delivery Driver' },
+  driverDesc: { ar: 'انضم لشبكتنا، خذ طلبات قريبة منك، ادفع لعائلتك بكرامة.', en: 'Join our network. Take nearby orders. Provide for your family.' },
+  socialCard: { ar: 'برنامج الخير', en: 'Care Program' },
+  socialDesc: { ar: 'للطلبة، كبار السن، اللاجئين والعمال — وجبات مدعومة بعد التحقق.', en: 'For students, elders, refugees, workers — subsidised meals after verification.' },
+  joinCta: { ar: 'سجّلني مع زوزو', en: 'Register with ZuZu' },
+
+  contactTitle: { ar: 'تواصلي معنا', en: 'Reach ZuZu' },
+  hours: { ar: 'زوزو متاحة على مدار الساعة', en: 'ZuZu is available 24/7' },
   location: { ar: 'الرياض، المملكة العربية السعودية', en: 'Riyadh, Saudi Arabia' },
   callNow: { ar: 'اتصل الآن', en: 'Call now' },
 
   dedication: {
-    ar: 'بُني هذا الموقع بحبٍّ من د. محمد إلى أُمّه الغالية 💚\nالله يحفظكِ ويُطيل عُمرَكِ يا يُمّه',
-    en: 'Built with love by Dr. Mohammed for his dear mother 💚\nMay God protect you and grant you long life, Mama',
+    ar: 'سُمّيت هذه المنصة باسم أُمّي زوزو — حفظها الله 💚\nمن يدِ يُمّه إلى كل سفرة في وطننا',
+    en: "This platform is named after my mother, ZuZu — may God protect her 💚\nFrom Mama's hands to every table in our homeland",
   },
-  chatWithMama: { ar: 'تكلّم مع يُمّه', en: 'Talk to Mama' },
+  chatWithMama: { ar: 'تكلّم مع زوزو', en: 'Talk to ZuZu' },
   closeChat: { ar: 'إغلاق', en: 'Close' },
 } as const
 
@@ -195,13 +223,13 @@ const Hero: React.FC = () => {
             className="group inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-gradient-to-l from-olive-dark to-olive text-cream font-medium text-lg shadow-lg shadow-olive/30 hover:shadow-xl hover:scale-[1.02] transition focus:outline-none focus:ring-4 focus:ring-olive/30"
           >
             <MessageCircle className="w-5 h-5 group-hover:rotate-[-6deg] transition" />
-            {t('orderWA')}
+            {t('heroOrderCta')}
           </a>
           <a
             href="#menu"
             className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-white/80 border-2 border-gold text-olive-dark font-medium text-lg hover:bg-white transition focus:outline-none focus:ring-4 focus:ring-gold/30"
           >
-            {t('browseMenu')}
+            {t('heroVoiceCta')}
             <ChevronDown className="w-5 h-5" />
           </a>
         </motion.div>
@@ -476,7 +504,7 @@ const ContactSection: React.FC = () => {
           className="inline-flex items-center justify-center gap-3 px-10 py-5 rounded-full bg-gradient-to-l from-olive-dark to-olive text-cream font-display text-xl shadow-2xl shadow-olive/40 hover:scale-[1.03] transition focus:outline-none focus:ring-4 focus:ring-olive/30"
         >
           <MessageCircle className="w-6 h-6" />
-          {t('orderWA')}
+          {t('heroOrderCta')}
         </a>
       </div>
     </section>
