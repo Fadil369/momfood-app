@@ -16,6 +16,7 @@
 import { fail } from '../../_lib/response'
 import type { Env } from '../../_middleware'
 import type { PagesFunction } from '@cloudflare/workers-types'
+import { rateLimit, getClientIp } from '../../_lib/rateLimit'
 
 const ZUZU_VOICE = 'cgSgspJ2msm6clMCkdW9' // Jessica — warm, natural, conversational
 const DEFAULT_MODEL = 'eleven_multilingual_v2'
@@ -23,6 +24,18 @@ const DEFAULT_MODEL = 'eleven_multilingual_v2'
 export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   if (!env.ELEVENLABS_API_KEY) {
     return fail('ElevenLabs not configured', 503, 'TTS_UNAVAILABLE')
+  }
+
+  const ip = getClientIp(request)
+  const rl = await rateLimit(env, `${ip}:zuzu_tts`, { max: 40, windowSec: 60 })
+  if (!rl.allowed) {
+    return new Response(
+      JSON.stringify({ ok: false, error: 'rate_limited', retry_after: rl.retryAfter }),
+      {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(rl.retryAfter) },
+      },
+    )
   }
 
   let body: { text?: string; voice_id?: string; model_id?: string; lang?: string }

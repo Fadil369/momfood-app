@@ -1,59 +1,86 @@
-// POST /api/zuzu/chat — ZuZu's brain, powered 100% by Cloudflare Workers AI.
+// POST /api/zuzu/chat — ZuZu's brain with full Phase 2 capabilities.
 //
-// Body:    { message: string, lang: 'ar'|'en', history?: {role,content}[] }
-// Returns: { ok: true, reply: string, data: { reply, provider, model } }
+// Body:   { message: string, lang: 'ar'|'en', session_id?: string }
+// Returns:{
+//   ok: true,
+//   reply: string,
+//   session_id: string,
+//   tool_calls?: [{ name, args, result }],
+//   data: { model, provider, latency_ms }
+// }
 //
-// Model strategy (in order):
-//   1. @cf/meta/llama-3.3-70b-instruct-fp8-fast  — best Arabic, very fast
-//   2. @cf/meta/llama-3.1-8b-instruct            — proven fallback
-//   3. canned reply                              — final safety net
+// Pipeline:
+//   1. Rate limit per IP (30/min)
+//   2. Get/create session in D1
+//   3. Load last 8 turns for context
+//   4. Call Llama 3.3-70b w/ tool definitions
+//   5. If model returns tool_calls → execute → feed back → second pass
+//   6. Persist user + assistant messages
+//   7. Return reply + session_id (client sets cookie)
 
 import { json, fail } from '../../_lib/response'
 import type { Env } from '../../_middleware'
 import type { PagesFunction } from '@cloudflare/workers-types'
+import {
+  TOOLS_BY_NAME,
+  toolDefinitions,
+  logToolCall,
+  type ToolResult,
+} from '../../_lib/tools'
+import {
+  getOrCreateSession,
+  appendMessage,
+  recentTurns,
+} from '../../_lib/sessions'
+import { rateLimit, getClientIp } from '../../_lib/rateLimit'
 
 const ZUZU_SYSTEM_AR = `أنتِ زوزو — وكيلة ذكية صوتية لمنصة "لُقْمَة يُمّه"، حاضنة المطابخ السحابية.
 سُمّيتِ على اسم والدة د. محمد الفاضل تكريماً لها 💚.
 
 شخصيتك:
 - دافئة، أُمّية، خفيفة الظل — كأنكِ خالة تنادي زبائنها "حبيبي" و"يا قلبي"
-- تتكلمين عربية واضحة بنكهة سعودية/سودانية مريحة
+- تتكلمين عربية واضحة بنكهة سعودية مريحة
 - صبورة مع كبار السن، مرحة مع الأطفال، مهنية مع الشركاء
 - لا تقولي أبداً "كذكاء اصطناعي" أو "كنموذج لغوي" — أنتِ زوزو، وبس
-- ردودك قصيرة (2-3 جمل) لأنكِ تتكلمين بالصوت
+- ردودك قصيرة (جملتين أو ثلاث) لأنكِ تتكلمين بالصوت
 
-مهامك:
-1) استقبال طلبات العملاء واقتراح أطباق من المطابخ المسجّلة
-2) تسجيل الطبّاخات الجدد (الاسم، المدينة، تخصص الطبخ، رقم الجوال)
-3) تنسيق التوصيل والإجابة عن استفسارات الحالة
-4) شرح برنامج الخير للطلبة وكبار السن والعمال واللاجئين
-5) دائماً اختمي بسؤال يفتح الباب للخطوة التالية
+مهامك (استخدمي الأدوات المتاحة وقت اللزوم):
+- list_kitchens / list_dishes: لما يسأل وش عندكم
+- start_order: لما يقول "أبغى أطلب كذا"
+- register_kitchen: لما تقول طبّاخة "أبغى أنضم"
+- request_callback: لما يبي يكلم د. محمد
+- check_status: لما يسأل عن طلب سابق
 
-اليوم أنتِ في وضع المعاينة — المنصة لسه في طور البناء. كوني صريحة لكن متفائلة: "نحن نبني هذه المنصة الآن بإذن الله، وقريباً نكون جاهزين بالكامل."`
+قواعد مهمة:
+1) لما تستخدمي أداة، اعتمدي على نتيجتها الحرفية في ردك
+2) اطلبي معلومات ناقصة بسؤال واحد فقط في كل مرة
+3) دائماً اختمي بسؤال يفتح الباب للخطوة التالية`
 
 const ZUZU_SYSTEM_EN = `You are ZuZu — the voice-first AI agent for "Loqmat Yummah", a cloud kitchen incubator.
-You are named in honor of Dr. Mohammed Al-Fadil's mother 💚.
+Named after Dr. Mohammed Al-Fadil's mother 💚.
 
 Personality:
-- Warm, motherly, a bit playful — like an auntie who calls customers "habibi"
-- Speak natural Arabic (Saudi/Sudanese flavor) when in Arabic mode, clear friendly English otherwise
+- Warm, motherly, playful — like an auntie who calls customers "habibi"
 - Patient with elders, playful with kids, professional with partners
-- NEVER say "as an AI" or "as a language model" — you are ZuZu, period
-- Keep replies short (2-3 sentences) because you speak via voice
+- NEVER say "as an AI" — you are ZuZu, period
+- 2-3 short sentences (voice-first)
 
-Your jobs:
-1) Take customer orders, suggest dishes from registered kitchens
-2) Onboard new home cooks (name, city, specialty, phone)
-3) Coordinate delivery and handle status inquiries
-4) Explain the Care Program for students, elders, workers, refugees
-5) Always end with a question that opens the next step
+Use available tools when relevant:
+- list_kitchens / list_dishes: when asked "what do you have"
+- start_order: when customer says "I want to order X"
+- register_kitchen: when a cook wants to join
+- request_callback: when user wants to talk to Dr. Mohammed
+- check_status: when asking about a previous order
 
-Today you are in preview mode — the platform is still being built. Be honest but hopeful: "We're building this platform now, and soon we'll be fully ready, inshallah."`
+Rules:
+1) When you use a tool, base your reply on its actual result
+2) Ask for missing info one question at a time
+3) Always end with a question that opens the next step`
 
 interface ChatBody {
   message: string
   lang?: 'ar' | 'en'
-  history?: { role: 'user' | 'assistant'; content: string }[]
+  session_id?: string
 }
 
 const MODELS = [
@@ -61,31 +88,83 @@ const MODELS = [
   '@cf/meta/llama-3.1-8b-instruct',
 ] as const
 
-interface LlamaResponse {
-  response?: string
-  result?: { response?: string }
+interface LlamaToolCall {
+  name?: string
+  arguments?: Record<string, unknown> | string
 }
 
-async function tryModel(
+interface LlamaResponse {
+  response?: string
+  tool_calls?: LlamaToolCall[]
+  result?: { response?: string; tool_calls?: LlamaToolCall[] }
+}
+
+async function llamaRun(
   ai: NonNullable<Env['AI']>,
   model: string,
-  messages: { role: string; content: string }[],
-): Promise<string | null> {
+  messages: unknown[],
+  tools?: ReturnType<typeof toolDefinitions>,
+): Promise<LlamaResponse | null> {
   try {
-    const result = (await ai.run(model, {
+    const input: Record<string, unknown> = {
       messages,
-      max_tokens: 240,
-      temperature: 0.75,
-    } as never)) as LlamaResponse
-    const reply = (result.response ?? result.result?.response ?? '').trim()
-    return reply || null
+      max_tokens: 280,
+      temperature: 0.7,
+    }
+    if (tools && tools.length) input.tools = tools
+    return (await ai.run(model, input as never)) as LlamaResponse
   } catch (e) {
-    console.error(`workers-ai model ${model} failed:`, (e as Error).message)
+    console.error(`llama ${model} failed:`, (e as Error).message)
     return null
   }
 }
 
+function parseToolCalls(resp: LlamaResponse): LlamaToolCall[] {
+  const raw = resp.tool_calls ?? resp.result?.tool_calls ?? []
+  return raw.filter((c): c is LlamaToolCall => !!c?.name)
+}
+
+function getText(resp: LlamaResponse): string {
+  return (resp.response ?? resp.result?.response ?? '').trim()
+}
+
+function parseArgs(call: LlamaToolCall): Record<string, unknown> {
+  const a = call.arguments
+  if (!a) return {}
+  if (typeof a === 'string') {
+    try {
+      return JSON.parse(a) as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  }
+  return a
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
+  const t0 = Date.now()
+
+  // ─── Rate limit (30/min/IP) ────────────────────────────────────────────
+  const ip = getClientIp(request)
+  const rl = await rateLimit(env, `${ip}:zuzu_chat`, { max: 30, windowSec: 60 })
+  if (!rl.allowed) {
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        error: 'rate_limited',
+        message: 'هدّي شوي يا قلبي، حاولي بعد لحظة',
+        retry_after: rl.retryAfter,
+      }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(rl.retryAfter),
+        },
+      },
+    )
+  }
+
   let body: ChatBody
   try {
     body = await request.json()
@@ -98,31 +177,123 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   if (!text) return fail('message required', 400, 'BAD_INPUT')
   if (text.length > 1500) return fail('message too long', 400, 'TOO_LONG')
 
+  // ─── Session ───────────────────────────────────────────────────────────
+  const session = await getOrCreateSession(env, body.session_id, lang)
+  await appendMessage(env, session.id, 'user', text)
+
+  const history = await recentTurns(env, session.id, 8)
   const system = lang === 'ar' ? ZUZU_SYSTEM_AR : ZUZU_SYSTEM_EN
-  const messages = [
+
+  let messages: unknown[] = [
     { role: 'system', content: system },
-    ...((body.history ?? []).slice(-8) as { role: string; content: string }[]),
-    { role: 'user', content: text },
+    ...history,
   ]
 
   if (!env.AI) {
     const fallback =
       lang === 'ar'
-        ? 'أهلين! أنا زوزو. دماغي مش متصل لسه — د. محمد يشتغل عليه. بس أبشري، قريب جداً نكون جاهزين 💚'
-        : "Hi! I'm ZuZu. My brain isn't wired yet — Dr. Mohammed is on it. We'll be ready very soon 💚"
-    return json({ ok: true, reply: fallback, data: { reply: fallback, provider: 'fallback', model: 'none' } })
+        ? 'أهلين! دماغي مش متصل لسه، بس بتجهز قريب جداً إن شاء الله 💚'
+        : "Hi! My brain isn't wired yet, but it will be very soon, inshallah 💚"
+    await appendMessage(env, session.id, 'assistant', fallback)
+    return json({
+      ok: true,
+      reply: fallback,
+      session_id: session.id,
+      data: { provider: 'fallback', model: 'none', latency_ms: Date.now() - t0 },
+    })
   }
 
+  const tools = toolDefinitions()
+  const toolCallsLog: { name: string; args: unknown; result: ToolResult }[] = []
+  let finalReply = ''
+  let usedModel = ''
+
+  // ─── Pass 1: ask Llama (with tools) ────────────────────────────────────
   for (const model of MODELS) {
-    const reply = await tryModel(env.AI, model, messages)
-    if (reply) {
-      return json({
-        ok: true,
-        reply,
-        data: { reply, provider: 'workers-ai', model },
-      })
+    const resp = await llamaRun(env.AI, model, messages, tools)
+    if (!resp) continue
+    usedModel = model
+
+    const calls = parseToolCalls(resp)
+    if (calls.length === 0) {
+      finalReply = getText(resp)
+      if (finalReply) break
+      continue
     }
+
+    // Execute tool calls (capped at 3 per turn to bound cost)
+    for (const call of calls.slice(0, 3)) {
+      const tool = TOOLS_BY_NAME[call.name!]
+      if (!tool) {
+        toolCallsLog.push({
+          name: call.name!,
+          args: call.arguments,
+          result: { ok: false, message: 'unknown tool', error: 'unknown_tool' },
+        })
+        continue
+      }
+      const args = parseArgs(call)
+      const t1 = Date.now()
+      let result: ToolResult
+      try {
+        result = await tool.execute(env, args, { sessionId: session.id, ip, lang })
+      } catch (e) {
+        result = { ok: false, message: 'حدث خطأ مؤقت', error: (e as Error).message }
+      }
+      await logToolCall(env, session.id, tool.name, args, result, Date.now() - t1)
+      toolCallsLog.push({ name: tool.name, args, result })
+      await appendMessage(
+        env,
+        session.id,
+        'tool',
+        JSON.stringify({ tool: tool.name, args, result }),
+      )
+    }
+
+    // ─── Pass 2: let Llama summarize tool results in ZuZu's voice ────────
+    const toolSummary = toolCallsLog
+      .map((t) => `${t.name}: ${t.result.message}`)
+      .join('\n')
+    const followUpInstruction =
+      lang === 'ar'
+        ? `استخدمي نتائج الأدوات التالية لتجاوبي على المستخدم بصوتك الدافئ. لا تكرري الأسئلة:\n${toolSummary}`
+        : `Use these tool results to reply in your warm voice (don't repeat questions):\n${toolSummary}`
+    const followUpMessages = [
+      { role: 'system', content: system },
+      ...history,
+      { role: 'system', content: followUpInstruction },
+    ]
+    const resp2 = await llamaRun(env.AI, model, followUpMessages)
+    if (resp2) {
+      finalReply = getText(resp2)
+      if (!finalReply) {
+        // fallback: stitch tool messages
+        finalReply = toolCallsLog.map((t) => t.result.message).join(' ')
+      }
+    } else {
+      finalReply = toolCallsLog.map((t) => t.result.message).join(' ')
+    }
+    break
   }
 
-  return fail('all Workers AI models failed', 502, 'LLM_ERROR')
+  if (!finalReply) {
+    finalReply =
+      lang === 'ar'
+        ? 'لحظة يا قلبي، حاولي مرة ثانية بعد شوي'
+        : 'One moment, please try again in a bit'
+  }
+
+  await appendMessage(env, session.id, 'assistant', finalReply)
+
+  return json({
+    ok: true,
+    reply: finalReply,
+    session_id: session.id,
+    tool_calls: toolCallsLog.length ? toolCallsLog : undefined,
+    data: {
+      provider: 'workers-ai',
+      model: usedModel || MODELS[0],
+      latency_ms: Date.now() - t0,
+    },
+  })
 }

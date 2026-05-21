@@ -1,11 +1,14 @@
 /**
- * useVoiceCapture — microphone capture + Web Audio analysis.
+ * useVoiceCapture — microphone capture with auto-stop VAD (Voice Activity
+ * Detection). When silence is detected for `silenceMs`, recording stops
+ * automatically and the recorded blob is returned via the optional
+ * `onAutoStop` callback (since hooks can't easily resolve a promise here).
  *
- * Provides:
- *   - start()/stop() recording
- *   - live `level` (0..1) for orb pulsing
- *   - live `bars` (Uint8Array) for frequency visualization
- *   - on stop, returns a Blob (audio/webm) for STT upload
+ * Tunables (sane defaults for warm conversational use):
+ *   silenceThreshold = 0.04   (level below which we count as silence)
+ *   silenceMs        = 1300   (ms of continuous silence to stop)
+ *   minRecordMs      = 700    (don't auto-stop before this)
+ *   maxRecordMs      = 30000  (hard cap)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -18,6 +21,14 @@ export interface VoiceCaptureState {
   error: string | null
 }
 
+export interface VoiceCaptureOptions {
+  silenceThreshold?: number
+  silenceMs?: number
+  minRecordMs?: number
+  maxRecordMs?: number
+  onAutoStop?: (blob: Blob | null) => void
+}
+
 export interface UseVoiceCapture extends VoiceCaptureState {
   start: () => Promise<void>
   stop: () => Promise<Blob | null>
@@ -26,7 +37,15 @@ export interface UseVoiceCapture extends VoiceCaptureState {
 
 const FFT_SIZE = 128
 
-export function useVoiceCapture(): UseVoiceCapture {
+export function useVoiceCapture(opts: VoiceCaptureOptions = {}): UseVoiceCapture {
+  const {
+    silenceThreshold = 0.04,
+    silenceMs = 1300,
+    minRecordMs = 700,
+    maxRecordMs = 30000,
+    onAutoStop,
+  } = opts
+
   const [state, setState] = useState<VoiceCaptureState>({
     isRecording: false,
     isSupported:
@@ -46,6 +65,12 @@ export function useVoiceCapture(): UseVoiceCapture {
   const rafRef = useRef<number | null>(null)
   const stopResolveRef = useRef<((blob: Blob | null) => void) | null>(null)
 
+  const startedAtRef = useRef<number>(0)
+  const lastVoiceAtRef = useRef<number>(0)
+  const autoStopFiredRef = useRef<boolean>(false)
+  const onAutoStopRef = useRef<typeof onAutoStop>(onAutoStop)
+  useEffect(() => { onAutoStopRef.current = onAutoStop }, [onAutoStop])
+
   const tick = useCallback(() => {
     const analyser = analyserRef.current
     if (!analyser) return
@@ -55,8 +80,33 @@ export function useVoiceCapture(): UseVoiceCapture {
     for (let i = 0; i < bars.length; i++) sum += bars[i]
     const level = Math.min(1, sum / bars.length / 180)
     setState((s) => ({ ...s, level, bars }))
+
+    // VAD
+    const now = performance.now()
+    if (level > silenceThreshold) {
+      lastVoiceAtRef.current = now
+    }
+    const elapsed = now - startedAtRef.current
+    const silentFor = now - lastVoiceAtRef.current
+    const shouldAutoStop =
+      !autoStopFiredRef.current &&
+      ((elapsed >= minRecordMs && silentFor >= silenceMs) || elapsed >= maxRecordMs)
+
+    if (shouldAutoStop) {
+      autoStopFiredRef.current = true
+      const rec = recorderRef.current
+      if (rec && rec.state !== 'inactive') {
+        // Attach a callback to receive the blob via onAutoStop
+        stopResolveRef.current = (blob) => {
+          onAutoStopRef.current?.(blob)
+        }
+        rec.stop()
+      }
+      return // skip raf — will restart on next start()
+    }
+
     rafRef.current = requestAnimationFrame(tick)
-  }, [])
+  }, [silenceThreshold, silenceMs, minRecordMs, maxRecordMs])
 
   const cleanup = useCallback(() => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
@@ -80,7 +130,8 @@ export function useVoiceCapture(): UseVoiceCapture {
       streamRef.current = stream
 
       const AudioCtor =
-        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       const ctx = new AudioCtor()
       audioCtxRef.current = ctx
       const source = ctx.createMediaStreamSource(stream)
@@ -115,6 +166,10 @@ export function useVoiceCapture(): UseVoiceCapture {
       }
       recorderRef.current = recorder
       recorder.start(100)
+
+      startedAtRef.current = performance.now()
+      lastVoiceAtRef.current = performance.now()
+      autoStopFiredRef.current = false
 
       setState((s) => ({ ...s, isRecording: true }))
       rafRef.current = requestAnimationFrame(tick)

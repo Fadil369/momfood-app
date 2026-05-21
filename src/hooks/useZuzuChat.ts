@@ -1,15 +1,16 @@
 /**
- * useZuzuChat — orchestrates ZuZu's voice loop.
+ * useZuzuChat — orchestrates ZuZu's voice loop with session memory and
+ * barge-in support.
  *
  *   audio Blob ──► /api/zuzu/stt   ──► transcript
  *                                      │
  *                                      ▼
- *                  /api/zuzu/chat  ──► assistant text
+ *                  /api/zuzu/chat  ──► assistant text + session_id
  *                                      │
  *                                      ▼
  *                  /api/zuzu/tts   ──► audio playback
  *
- * Also exposes a `speak(text)` helper for the welcome greeting.
+ *   stopSpeaking() interrupts playback (barge-in).
  */
 
 import { useCallback, useRef, useState } from 'react'
@@ -30,16 +31,16 @@ export interface UseZuzuChat {
   history: ZuzuTurn[]
   audioLevel: number
   error: string | null
-  /** Send an audio blob through the full STT → LLM → TTS loop */
+  sessionId: string | null
   processAudio: (blob: Blob, lang: 'ar' | 'en') => Promise<void>
-  /** Just speak (used for greeting) */
   speak: (text: string, lang: 'ar' | 'en') => Promise<void>
-  /** Send a typed message (skip STT) */
   sendText: (text: string, lang: 'ar' | 'en') => Promise<void>
+  stopSpeaking: () => void
   reset: () => void
 }
 
 const API_BASE = '/api/zuzu'
+const SESSION_KEY = 'zuzu_session_id'
 
 export function useZuzuChat(): UseZuzuChat {
   const [mode, setMode] = useState<ZuzuMode>('idle')
@@ -48,11 +49,19 @@ export function useZuzuChat(): UseZuzuChat {
   const [history, setHistory] = useState<ZuzuTurn[]>([])
   const [audioLevel, setAudioLevel] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    try {
+      return typeof window !== 'undefined' ? localStorage.getItem(SESSION_KEY) : null
+    } catch {
+      return null
+    }
+  })
 
   const audioElRef = useRef<HTMLAudioElement | null>(null)
   const audioAnalyserRef = useRef<AnalyserNode | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const rafRef = useRef<number | null>(null)
+  const urlRef = useRef<string | null>(null)
 
   const cleanupAudio = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
@@ -62,6 +71,10 @@ export function useZuzuChat(): UseZuzuChat {
       audioElRef.current.src = ''
       audioElRef.current = null
     }
+    if (urlRef.current) {
+      URL.revokeObjectURL(urlRef.current)
+      urlRef.current = null
+    }
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       audioCtxRef.current.close().catch(() => {})
     }
@@ -69,6 +82,11 @@ export function useZuzuChat(): UseZuzuChat {
     audioAnalyserRef.current = null
     setAudioLevel(0)
   }, [])
+
+  const stopSpeaking = useCallback(() => {
+    cleanupAudio()
+    setMode('idle')
+  }, [cleanupAudio])
 
   const reset = useCallback(() => {
     cleanupAudio()
@@ -79,15 +97,23 @@ export function useZuzuChat(): UseZuzuChat {
     setError(null)
   }, [cleanupAudio])
 
-  /** Plays MP3 from a fetch Response while pumping `audioLevel` for orb visuals. */
+  const persistSession = useCallback((id: string) => {
+    setSessionId(id)
+    try {
+      localStorage.setItem(SESSION_KEY, id)
+    } catch {
+      // ignore quota / privacy errors
+    }
+  }, [])
+
   const playStream = useCallback(
     async (resp: Response) => {
       const audioBlob = await resp.blob()
       const url = URL.createObjectURL(audioBlob)
+      urlRef.current = url
       const el = new Audio(url)
       audioElRef.current = el
 
-      // Hook up analyser for live amplitude on the orb
       try {
         const AudioCtor =
           window.AudioContext ||
@@ -116,9 +142,12 @@ export function useZuzuChat(): UseZuzuChat {
       await new Promise<void>((resolve) => {
         el.onended = () => resolve()
         el.onerror = () => resolve()
+        el.onpause = () => {
+          // If user-initiated pause (barge-in), resolve too
+          if (el.currentTime > 0 && !el.ended) resolve()
+        }
         el.play().catch(() => resolve())
       })
-      URL.revokeObjectURL(url)
       cleanupAudio()
     },
     [cleanupAudio],
@@ -161,17 +190,29 @@ export function useZuzuChat(): UseZuzuChat {
           body: JSON.stringify({
             message: text,
             lang,
-            history: history.slice(-8).map((t) => ({ role: t.role, content: t.text })),
+            session_id: sessionId ?? undefined,
           }),
         })
-        if (!chatResp.ok) throw new Error(`chat ${chatResp.status}`)
-        const { reply: assistantText } = (await chatResp.json()) as {
+        if (!chatResp.ok) {
+          if (chatResp.status === 429) {
+            const j = (await chatResp.json().catch(() => ({}))) as { message?: string }
+            const m =
+              j.message ||
+              (lang === 'ar' ? 'هدّي شوي يا قلبي' : 'Easy there, try again in a moment')
+            setReply(m)
+            await speak(m, lang)
+            return
+          }
+          throw new Error(`chat ${chatResp.status}`)
+        }
+        const data = (await chatResp.json()) as {
           ok: boolean
-          reply?: string
-          data?: { reply: string }
-        } & { reply: string }
+          reply: string
+          session_id?: string
+        }
+        if (data.session_id) persistSession(data.session_id)
         const replyText =
-          (assistantText as string) ||
+          data.reply ||
           (lang === 'ar' ? 'أهلين، أنا زوزو. كيف أقدر أساعدك؟' : "Hi, I'm ZuZu. How can I help?")
         setReply(replyText)
         setHistory((h) => [...h, { role: 'assistant', text: replyText, ts: Date.now() }])
@@ -181,7 +222,7 @@ export function useZuzuChat(): UseZuzuChat {
         setMode('idle')
       }
     },
-    [history, speak],
+    [sessionId, persistSession, speak],
   )
 
   const processAudio = useCallback(
@@ -199,8 +240,8 @@ export function useZuzuChat(): UseZuzuChat {
           text?: string
           data?: { text: string }
         }
-        const text = sttData.text || sttData.data?.text || ''
-        if (!text.trim()) {
+        const text = (sttData.text || sttData.data?.text || '').trim()
+        if (!text) {
           setMode('idle')
           return
         }
@@ -221,9 +262,11 @@ export function useZuzuChat(): UseZuzuChat {
     history,
     audioLevel,
     error,
+    sessionId,
     processAudio,
     speak,
     sendText,
+    stopSpeaking,
     reset,
   }
 }

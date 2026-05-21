@@ -1,24 +1,23 @@
 /**
- * ZuzuVoiceHero — the hero section of mom.elfadil.com.
- * The central orb IS ZuZu. Tap to talk. She listens, thinks, replies.
+ * ZuzuVoiceHero — hero section with full Phase 2 voice loop.
  *
- * Hooks together:
- *   - useVoiceCapture (mic + analysis)
- *   - useZuzuChat     (STT → LLM → TTS)
- *   - ZuzuOrb         (visual)
+ *   - Tap orb during 'speaking' → barge-in (stop ZuZu, start listening)
+ *   - Tap orb during 'idle' → start listening
+ *   - VAD auto-stops on silence → STT → chat (with tools) → TTS
+ *   - Session id persists in localStorage for cross-turn memory
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Languages, Volume2, VolumeX } from 'lucide-react'
+import { Languages, Volume2, VolumeX, Sparkles } from 'lucide-react'
 import { ZuzuOrb, type ZuzuOrbState } from '@/components/voice/ZuzuOrb'
 import { useVoiceCapture } from '@/hooks/useVoiceCapture'
 import { useZuzuChat } from '@/hooks/useZuzuChat'
 import { useLanguage } from '@/contexts/LanguageContext'
 
 const GREETINGS = {
-  ar: 'أهلين بكِ في لُقْمَة يُمّه. أنا زوزو — مساعدتك الذكية. اضغطي على الدائرة وكلميني عن اللي تبينه.',
-  en: "Welcome to Loqmat Yummah. I'm ZuZu — your smart assistant. Tap the circle and tell me what you're craving.",
+  ar: 'أهلين بكِ في لُقْمَة يُمّه. أنا زوزو، مساعدتك. اضغطي على الدائرة وكلميني — أنا أسمعك.',
+  en: "Welcome to Loqmat Yummah. I'm ZuZu, your assistant. Tap the circle and just talk — I'll hear you.",
 }
 
 const STATE_LABELS = {
@@ -26,25 +25,57 @@ const STATE_LABELS = {
     idle: 'اضغطي للكلام',
     listening: 'أسمعك… تكلمي',
     thinking: 'لحظة أفكر…',
-    speaking: 'زوزو تتكلم',
+    speaking: 'زوزو تتكلم — اضغطي للمقاطعة',
   },
   en: {
     idle: 'Tap to talk',
     listening: "I'm listening…",
     thinking: 'Thinking…',
-    speaking: 'ZuZu speaking',
+    speaking: 'ZuZu speaking — tap to interrupt',
   },
+} as const
+
+const SUGGESTIONS = {
+  ar: [
+    'وش عندكم اليوم؟',
+    'أبغى أسجل مطبخي',
+    'عندكم كبسة بالرياض؟',
+    'أبغى أكلم د. محمد',
+  ],
+  en: [
+    'What do you have today?',
+    'I want to register my kitchen',
+    'Do you have kabsa in Riyadh?',
+    'I want to talk to Dr. Mohammed',
+  ],
 } as const
 
 export const ZuzuVoiceHero: React.FC = () => {
   const { lang, toggle: toggleLang } = useLanguage()
-  const mic = useVoiceCapture()
   const chat = useZuzuChat()
-  const [muted, setMuted] = useState(true) // start muted; user must opt in for audio (autoplay policy)
+  const [muted, setMuted] = useState(true)
   const [greeted, setGreeted] = useState(false)
-  const [showCaptions] = useState(true)
 
-  // Derive overall orb state from mic/chat
+  // VAD auto-stop → process audio
+  const onAutoStop = useCallback(
+    (blob: Blob | null) => {
+      if (blob) {
+        chat.processAudio(blob, lang).catch(() => {})
+      } else {
+        chat.setMode('idle')
+      }
+    },
+    [chat, lang],
+  )
+
+  const mic = useVoiceCapture({
+    silenceMs: 1300,
+    silenceThreshold: 0.04,
+    minRecordMs: 700,
+    maxRecordMs: 25000,
+    onAutoStop,
+  })
+
   const orbState: ZuzuOrbState = mic.isRecording
     ? 'listening'
     : chat.mode === 'thinking'
@@ -63,24 +94,45 @@ export const ZuzuVoiceHero: React.FC = () => {
 
   const onOrbTap = async () => {
     if (muted) {
-      // First tap unmutes + greets
       setMuted(false)
       return
     }
-    if (chat.mode === 'speaking' || chat.mode === 'thinking') {
-      // Tap during ZuZu reply -> interrupt (future); for now ignore
+
+    // Barge-in: tap while speaking → stop and start listening
+    if (chat.mode === 'speaking') {
+      chat.stopSpeaking()
+      try {
+        await mic.start()
+      } catch {
+        // mic denied
+      }
       return
     }
+
+    if (chat.mode === 'thinking') return
+
     if (mic.isRecording) {
+      // Manual stop (user tapped to cut short before VAD)
       const blob = await mic.stop()
       if (blob) await chat.processAudio(blob, lang)
     } else {
       try {
         await mic.start()
       } catch {
-        // user denied mic
+        // mic denied
       }
     }
+  }
+
+  const onSuggestion = async (text: string) => {
+    if (muted) {
+      setMuted(false)
+      // Defer 200ms so greeting starts; then send suggestion
+      setTimeout(() => chat.sendText(text, lang).catch(() => {}), 200)
+      return
+    }
+    if (chat.mode === 'speaking') chat.stopSpeaking()
+    await chat.sendText(text, lang)
   }
 
   const visualLevel = mic.isRecording ? mic.level : chat.audioLevel
@@ -111,7 +163,6 @@ export const ZuzuVoiceHero: React.FC = () => {
         <button
           onClick={toggleLang}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 backdrop-blur-md border border-white/60 shadow text-sm font-medium text-olive-dark hover:bg-white transition"
-          aria-label={lang === 'ar' ? 'English' : 'العربية'}
         >
           <Languages className="w-4 h-4" />
           {lang === 'ar' ? 'EN' : 'AR'}
@@ -119,10 +170,15 @@ export const ZuzuVoiceHero: React.FC = () => {
         <button
           onClick={() => setMuted((m) => !m)}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 backdrop-blur-md border border-white/60 shadow text-sm font-medium text-olive-dark hover:bg-white transition"
-          aria-label={muted ? (lang === 'ar' ? 'تفعيل الصوت' : 'Unmute') : lang === 'ar' ? 'كتم' : 'Mute'}
         >
           {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          {muted ? (lang === 'ar' ? 'الصوت مكتوم' : 'Muted') : lang === 'ar' ? 'مفتوح' : 'On'}
+          {muted
+            ? lang === 'ar'
+              ? 'الصوت مكتوم'
+              : 'Muted'
+            : lang === 'ar'
+            ? 'مفتوح'
+            : 'On'}
         </button>
       </div>
 
@@ -169,19 +225,17 @@ export const ZuzuVoiceHero: React.FC = () => {
           level={visualLevel}
           bars={mic.bars}
           onTap={onOrbTap}
-          size={
-            typeof window !== 'undefined' && window.innerWidth < 480 ? 280 : 340
-          }
+          size={typeof window !== 'undefined' && window.innerWidth < 480 ? 280 : 340}
           labelAr={STATE_LABELS.ar[orbState]}
           labelEn={STATE_LABELS.en[orbState]}
           lang={lang}
         />
       </motion.div>
 
-      {/* Captions (transcript / reply) */}
+      {/* Captions */}
       <div className="mt-20 z-10 w-full max-w-2xl px-2">
         <AnimatePresence mode="wait">
-          {showCaptions && (chat.transcript || chat.reply) && (
+          {(chat.transcript || chat.reply) && (
             <motion.div
               key={chat.reply || chat.transcript}
               initial={{ opacity: 0, y: 12 }}
@@ -193,9 +247,7 @@ export const ZuzuVoiceHero: React.FC = () => {
             >
               {chat.transcript && (
                 <p className="text-sm text-olive/70 mb-2">
-                  <span className="font-medium">
-                    {lang === 'ar' ? 'أنت:' : 'You:'}
-                  </span>{' '}
+                  <span className="font-medium">{lang === 'ar' ? 'أنت:' : 'You:'}</span>{' '}
                   {chat.transcript}
                 </p>
               )}
@@ -211,27 +263,44 @@ export const ZuzuVoiceHero: React.FC = () => {
           )}
         </AnimatePresence>
 
+        {/* Suggestion chips when idle */}
+        {!chat.transcript && !chat.reply && (
+          <div className="mt-8 flex flex-wrap gap-2 justify-center">
+            {SUGGESTIONS[lang].map((s) => (
+              <button
+                key={s}
+                onClick={() => onSuggestion(s)}
+                disabled={chat.mode === 'thinking'}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 backdrop-blur-md border border-gold/30 text-sm text-olive-dark hover:bg-white hover:border-gold transition disabled:opacity-40"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-gold" />
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Error */}
         {(mic.error || chat.error) && (
           <div className="mt-4 text-center text-sm text-rose-600/80">
-            {mic.error === 'mic_denied' || mic.error?.includes('denied')
+            {mic.error?.includes('denied') || mic.error === 'mic_denied'
               ? lang === 'ar'
-                ? 'يرجى السماح بالوصول للميكروفون لتحدثي مع زوزو 🎙️'
-                : 'Please allow microphone access to talk to ZuZu 🎙️'
+                ? 'يرجى السماح بالميكروفون لتحدثي مع زوزو 🎙️'
+                : 'Please allow microphone access 🎙️'
               : mic.error || chat.error}
           </div>
         )}
 
         {/* Hint */}
         {!chat.transcript && !chat.reply && (
-          <p className="mt-6 text-center text-sm text-olive/60">
-            {lang === 'ar'
-              ? muted
-                ? '🔇 اضغطي على الدائرة لتفعيل الصوت والترحيب من زوزو'
-                : '💡 جربي تقولين: «زوزو، شو عندك اليوم؟» أو «أبغى أسجل مطبخي»'
-              : muted
-              ? '🔇 Tap the orb to unmute and meet ZuZu'
-              : '💡 Try: "ZuZu, what\'s on the menu today?" or "I want to register my kitchen"'}
+          <p className="mt-6 text-center text-xs text-olive/50">
+            {muted
+              ? lang === 'ar'
+                ? '🔇 اضغطي على الدائرة لتفعيل الصوت'
+                : '🔇 Tap the orb to unmute'
+              : lang === 'ar'
+              ? '🎙️ تتوقف تلقائياً عند الصمت • اضغطي وقت كلام زوزو لمقاطعتها'
+              : '🎙️ Auto-stops on silence • Tap while ZuZu speaks to interrupt'}
           </p>
         )}
       </div>
