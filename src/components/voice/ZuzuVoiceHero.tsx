@@ -41,7 +41,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const GREETINGS = {
   ar: 'أهلين بكِ في لُقْمَة يُمّه. أنا زوزو، مساعدتك. اضغطي على الدائرة وكلميني — أنا أسمعك.',
@@ -157,7 +157,6 @@ export const ZuzuVoiceHero: React.FC = () => {
   const orbSize = typeof window !== 'undefined' && window.innerWidth < 480 ? 280 : 340
 
   return (
-    <TooltipProvider delayDuration={300}>
       <section
         id="zuzu-hero"
         dir={isAr ? 'rtl' : 'ltr'}
@@ -432,7 +431,6 @@ export const ZuzuVoiceHero: React.FC = () => {
           )}
         </div>
       </section>
-    </TooltipProvider>
   )
 }
 

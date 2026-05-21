@@ -4,6 +4,7 @@ import { Languages, Sparkles, Github, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface SiteHeaderProps {
   onScrollToHero?: () => void
@@ -56,6 +57,7 @@ export const SiteHeader: React.FC<SiteHeaderProps> = () => {
               <Languages className="h-4 w-4" />
               <span className="hidden sm:inline">{isAr ? "EN" : "العربية"}</span>
             </Button>
+            <ThemeToggle className="rounded-full" />
             <Button
               asChild
               variant="ghost"
