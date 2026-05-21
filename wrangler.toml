@@ -1,6 +1,10 @@
-# Wrangler configuration for Cloudflare Pages
 name = "momfood-app"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# ─── Cloudflare Pages frontend config ───────────────────────────────────────
+# The React app builds to ./dist and serves from this Pages project.
+# Domain mom.elfadil.com is bound via Cloudflare dashboard.
 
 [env.production]
 account_id = "YOUR_ACCOUNT_ID_HERE"
@@ -23,3 +27,31 @@ upload.directory = "dist"
 
 [build.env]
 NODE_VERSION = "20"
+
+# ─── D1 binding (ZuZu Platform — Phase 0) ───────────────────────────────────
+# Provision with:
+#   wrangler d1 create momfood-zuzu
+# Then paste the database_id below.
+# Apply schema:
+#   wrangler d1 migrations apply momfood-zuzu --remote
+
+[[d1_databases]]
+binding = "DB"
+database_name = "momfood-zuzu"
+database_id = "REPLACE_WITH_D1_ID_AFTER_CREATE"
+migrations_dir = "migrations"
+
+# ─── R2 bucket (verification docs + dish photos) ────────────────────────────
+# Provision with:
+#   wrangler r2 bucket create momfood-uploads
+
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "momfood-uploads"
+
+# ─── Secrets (set via `wrangler secret put <KEY>`) ──────────────────────────
+#   ELEVENLABS_API_KEY     — TTS / ConvAI
+#   DEEPSEEK_API_KEY       — LLM (reuse from hnh-unified)
+#   JWT_SIGNING_KEY        — session token signing
+#   GRAVATAR_API_KEY       — avatar lookup
+#   ADMIN_BOOTSTRAP_PHONE  — seed admin user phone for first install
