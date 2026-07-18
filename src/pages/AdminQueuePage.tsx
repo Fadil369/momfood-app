@@ -109,7 +109,10 @@ const AdminQueuePage: React.FC = () => {
     } catch (e) {
       const msg = (e as Error).message
       setError(msg)
-      if (msg === 'unauthorized') window.sessionStorage.removeItem(TOKEN_KEY)
+      if (msg === 'unauthorized') {
+        window.sessionStorage.removeItem(TOKEN_KEY)
+        setToken('')
+      }
     } finally {
       setLoading(false)
     }

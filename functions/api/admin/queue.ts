@@ -11,10 +11,18 @@ import { fail, json } from '../../_lib/response'
 import type { Env } from '../../_middleware'
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
+// Hash both sides to a fixed-length digest before comparing, so neither the
+// early-return nor the comparison loop leaks the token's actual length.
+async function timingSafeEqual(a: string, b: string): Promise<boolean> {
+  const encoder = new TextEncoder()
+  const [aHash, bHash] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(a)),
+    crypto.subtle.digest('SHA-256', encoder.encode(b)),
+  ])
+  const aArr = new Uint8Array(aHash)
+  const bArr = new Uint8Array(bHash)
   let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  for (let i = 0; i < aArr.length; i++) diff |= aArr[i] ^ bArr[i]
   return diff === 0
 }
 
@@ -57,7 +65,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
 
   const auth = request.headers.get('Authorization') ?? ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  if (!token || !timingSafeEqual(token, env.ADMIN_TOKEN)) {
+  if (!token || !(await timingSafeEqual(token, env.ADMIN_TOKEN))) {
     return fail('unauthorized', 401, 'UNAUTHORIZED')
   }
 
