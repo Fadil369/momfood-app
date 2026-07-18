@@ -1,1 +1,14 @@
-# Headers
+# Cloudflare Pages headers — https://developers.cloudflare.com/pages/configuration/headers/
+# Applied to every response. ZuZu's page requests microphone access and calls
+# only same-origin APIs (/api/zuzu/*) plus Google Fonts, so the CSP is scoped tight.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: microphone=(self), camera=(), geolocation=(), payment=()
+
+# Keep the internal ops queue out of search results
+/admin/*
+  X-Robots-Tag: noindex, nofollow

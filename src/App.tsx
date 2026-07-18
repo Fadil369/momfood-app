@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 const ZuZuAgent = lazy(() => import('./ai/ZuZuAgent'))
+const AdminQueuePage = lazy(() => import('./pages/AdminQueuePage'))
 
 function App() {
   return (
@@ -21,6 +22,14 @@ function App() {
                 element={
                   <Suspense fallback={<div className="p-8 text-center text-muted-foreground">جاري التحميل…</div>}>
                     <ZuZuAgent />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/admin/queue"
+                element={
+                  <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
+                    <AdminQueuePage />
                   </Suspense>
                 }
               />
