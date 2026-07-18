@@ -10,6 +10,7 @@ export interface Env {
   ELEVENLABS_API_KEY?: string
   JWT_SIGNING_KEY?: string
   GRAVATAR_API_KEY?: string
+  ADMIN_TOKEN?: string
 }
 
 const ALLOWED_ORIGINS = new Set([
