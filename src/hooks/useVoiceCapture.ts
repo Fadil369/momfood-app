@@ -51,7 +51,7 @@ export function useVoiceCapture(opts: VoiceCaptureOptions = {}): UseVoiceCapture
     isSupported:
       typeof window !== 'undefined' &&
       !!navigator?.mediaDevices?.getUserMedia &&
-      !!(window.MediaRecorder || (window as any).webkitMediaRecorder),
+      !!(window.MediaRecorder || (window as unknown as { webkitMediaRecorder?: unknown }).webkitMediaRecorder),
     level: 0,
     bars: null,
     error: null,
