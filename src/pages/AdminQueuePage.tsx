@@ -121,7 +121,7 @@ const AdminQueuePage: React.FC = () => {
 
   if (!token || error === 'unauthorized') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-background">
+      <div dir="ltr" className="min-h-screen flex items-center justify-center px-4 bg-background">
         <Card variant="premium" className="w-full max-w-sm">
           <CardContent className="p-6 space-y-4">
             <h1 className="font-display font-bold text-xl">ZuZu — Admin Queue</h1>
@@ -150,7 +150,7 @@ const AdminQueuePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-10">
+    <div dir="ltr" className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto max-w-5xl">
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-display font-bold text-2xl">ZuZu — Admin Queue</h1>
