@@ -83,6 +83,20 @@ interface ChatBody {
   session_id?: string
 }
 
+// Tools that write a lead into D1 (as opposed to read-only lookups like
+// list_kitchens/check_status). Capped separately and more tightly than the
+// general chat rate limit, since each one lands in a queue a human works by
+// hand — a script well under the 30/min chat ceiling can otherwise flood it.
+const LEAD_WRITE_TOOLS = new Set([
+  'register_kitchen',
+  'start_order',
+  'request_callback',
+])
+const LEAD_LIMIT_BLOCKED_MESSAGE = {
+  ar: 'وصلتِ للحد اليومي لهذا النوع من الطلبات — حاولي بكرة أو اطلبي من زوزو تكلمك د. محمد مباشرة',
+  en: "You've hit today's limit for this kind of request — try again tomorrow, or ask ZuZu to have Dr. Mohammed call you directly.",
+}
+
 const MODELS = [
   '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
   '@cf/meta/llama-3.1-8b-instruct',
@@ -235,6 +249,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
       const args = parseArgs(call)
       const t1 = Date.now()
       let result: ToolResult
+      if (LEAD_WRITE_TOOLS.has(tool.name)) {
+        const leadRl = await rateLimit(env, `${ip}:zuzu_leads`, { max: 5, windowSec: 86400 })
+        if (!leadRl.allowed) {
+          result = { ok: false, message: LEAD_LIMIT_BLOCKED_MESSAGE[lang], error: 'lead_rate_limited' }
+          await logToolCall(env, session.id, tool.name, args, result, Date.now() - t1)
+          toolCallsLog.push({ name: tool.name, args, result })
+          continue
+        }
+      }
       try {
         result = await tool.execute(env, args, { sessionId: session.id, ip, lang })
       } catch (e) {
